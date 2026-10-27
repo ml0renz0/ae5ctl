@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ae5ctl"
+version = "0.0.1"
+description = "Command-line tools for the Sound BlasterX AE-5 (in development)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.5", "pytest-cov==6.1.1", "ruff==0.11.13", "build==1.2.2.post1"]
+
+[project.scripts]
+ae5ctl = "ae5ctl.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+
+[tool.ruff]
+target-version = "py310"
+extend-exclude = ["legacy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
