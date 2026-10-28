@@ -1,0 +1,6 @@
+#!/usr/bin/python3
+"""Debian launcher: use the system Python and distribution module path."""
+
+from ae5ctl.cli import main
+
+raise SystemExit(main())
