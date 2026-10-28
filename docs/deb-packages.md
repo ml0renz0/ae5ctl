@@ -111,8 +111,11 @@ no comprueba este `.sig` automáticamente.
 
 ## CI/CD automático
 
-El workflow **CI/CD** se ejecuta al subir cambios a cualquier rama y en las PR.
-Las comprobaciones forman una cadena: si falla una, no se firma ni se publica.
+El desarrollo sigue TBD: ramas de trabajo cortas, PR hacia `main`, validación y
+revisión antes de fusionar. No se integra mediante push directo a `main`.
+El workflow **CI/CD** valida las PR hacia `main` y los candidatos de la merge
+queue. Tras fusionar una PR, el `push` resultante en `main` ejecuta la cadena
+completa de publicación. Si falla una comprobación, no se firma ni se publica.
 
 1. Tests con Python 3.10, 3.11, 3.12 y 3.13, lint y formato.
 2. Generación de un único `.deb` y su checksum, sin root ni descargas del builder.
@@ -120,6 +123,13 @@ Las comprobaciones forman una cadena: si falla una, no se firma ni se publica.
 4. Solo para un `push` a `main`, firma OpenSSL del mismo archivo ya probado.
 5. Publicación automática de una prerelease en GitHub Releases, con `.deb`,
    `.deb.sha256`, `.deb.sig` y `signing-public.pem`.
+
+El check estable `CI required` solo pasa cuando todas las versiones de Python,
+la generación del paquete y ambas pruebas Ubuntu han terminado correctamente.
+Es el check que debe exigirse en la protección de `main`, junto con la
+obligación de integrar por PR. El workflow no cambia las reglas del repositorio;
+esas reglas se configuran en GitHub. La firma y la publicación solo ocurren en
+`main`, nunca durante la validación de una PR o de la merge queue.
 
 No hace falta crear etiquetas, ejecutar Actions manualmente ni usar la API de
 GitHub desde tu equipo. Para descargar los paquetes publicados, abre

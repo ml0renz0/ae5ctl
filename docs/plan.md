@@ -31,6 +31,10 @@ controlador, PipeWire, PulseAudio o el gestor de sesión.
 La validación con hardware empieza en la fase 01 y continúa en cada cambio de
 comportamiento. No se pospone íntegramente a una release final.
 
+El flujo de integración es TBD: ramas cortas y PR hacia `main`, con revisión y
+el check `CI required` antes de fusionar. No se hace push directo a `main`.
+La publicación automática ocurre después de integrar, desde `main`.
+
 ## Empaquetado adelantado
 
 A petición del usuario, se adelanta de la fase 05 la generación de paquetes

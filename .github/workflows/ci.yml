@@ -3,8 +3,13 @@ name: CI/CD
 on:
   push:
     branches:
-      - "**"
+      - main
   pull_request:
+    branches:
+      - main
+  merge_group:
+    types:
+      - checks_requested
 
 permissions:
   contents: read
@@ -95,9 +100,27 @@ jobs:
             "$UBUNTU_IMAGE" sh -ec \
             'set -- /packages/*.deb; test "$#" -eq 1; sh /smoke_deb.sh "$1"'
 
+  required:
+    name: CI required
+    needs: [tests, package, smoke]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require all validation jobs to succeed
+        env:
+          TESTS_RESULT: ${{ needs.tests.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: |
+          if [[ "$TESTS_RESULT" != success || "$PACKAGE_RESULT" != success || "$SMOKE_RESULT" != success ]]; then
+            echo 'Tests, Debian build and both Ubuntu smoke tests must succeed.' >&2
+            exit 1
+          fi
+
   publish:
     name: Sign and publish development release
-    needs: [tests, package, smoke]
+    needs: [required, package]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

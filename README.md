@@ -110,8 +110,9 @@ ae5ctl doctor --json
 sudo apt remove ae5ctl
 ```
 
-El [flujo CI/CD](docs/deb-packages.md#cicd-automático) valida las PR y, al integrar
-cambios en `main`, genera, prueba, firma y publica automáticamente el `.deb` en
+Trabajamos con TBD: ramas cortas y PR hacia `main`. El
+[flujo CI/CD](docs/deb-packages.md#cicd-automático) valida las PR y, al fusionarlas
+en `main`, genera, prueba, firma y publica automáticamente el `.deb` en
 [Releases](https://github.com/ml0renz0/ae5ctl/releases). No requiere crear etiquetas
 ni ejecutar workflows manualmente. La firma es separada: APT no verifica los
 archivos `.sig` de OpenSSL automáticamente.
