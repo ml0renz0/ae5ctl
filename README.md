@@ -110,9 +110,10 @@ ae5ctl doctor --json
 sudo apt remove ae5ctl
 ```
 
-El [flujo de empaquetado y firma](docs/deb-packages.md) explica la construcción
-reproducible, la firma con clave OpenSSL cifrada y la generación manual de
-artefactos desde GitHub Actions. La firma es separada: APT no verifica los
+El [flujo CI/CD](docs/deb-packages.md#cicd-automático) valida las PR y, al integrar
+cambios en `main`, genera, prueba, firma y publica automáticamente el `.deb` en
+[Releases](https://github.com/ml0renz0/ae5ctl/releases). No requiere crear etiquetas
+ni ejecutar workflows manualmente. La firma es separada: APT no verifica los
 archivos `.sig` de OpenSSL automáticamente.
 
 ## Limitaciones del script original
@@ -142,6 +143,7 @@ La modalidad predeterminada sigue pendiente de esa evidencia.
 
 Los cambios se organizan por fases verificables. Las pruebas sin hardware y las
 comprobaciones manuales con la AE-5 se documentarán por separado. Se puede instalar
-la CLI como paquete Python o generar un `.deb` de desarrollo. El arranque automático y la
-publicación de versiones quedan para fases posteriores.
-La licencia del proyecto está pendiente de elección.
+la CLI como paquete Python o generar un `.deb` de desarrollo. CI/CD publica las
+compilaciones verificadas de `main` como prereleases. El arranque automático y la
+validación funcional con hardware siguen pendientes, al igual que la elección
+de licencia del proyecto.

@@ -2,8 +2,8 @@
 
 El paquete actual contiene la CLI de lectura ALSA. No incluye la bandeja GTK,
 perfiles de audio, servicios, reglas de suspensión ni recuperación automática.
-La licencia sigue pendiente de elección; generar el artefacto de desarrollo no
-equivale a publicarlo ni a conceder permisos de redistribución.
+La licencia sigue pendiente de elección. La publicación automática de builds
+no concede por sí misma permisos de redistribución del código.
 
 ## Generar e instalar
 
@@ -109,39 +109,57 @@ detecta cambios, pero por sí solo no autentica al autor. La firma separada de
 OpenSSL no es una firma GPG de Debian ni un repositorio APT firmado; `apt install`
 no comprueba este `.sig` automáticamente.
 
-## GitHub Actions
+## CI/CD automático
 
-El workflow **Debian package** se ejecuta al subir una etiqueta `deb-*` o
-manualmente desde Actions. Las etiquetas de construcción solicitan siempre firma;
-la ejecución manual permite elegirla con `sign`. Genera el
-paquete, comprueba instalación y eliminación en contenedores Ubuntu 22.04 y
-24.04, y guarda el artefacto `ae5ctl-deb`. No publica releases ni un repositorio
-APT.
+El workflow **CI/CD** se ejecuta al subir cambios a cualquier rama y en las PR.
+Las comprobaciones forman una cadena: si falla una, no se firma ni se publica.
 
-Para la firma, configura estos secretos del repositorio:
+1. Tests con Python 3.10, 3.11, 3.12 y 3.13, lint y formato.
+2. Generación de un único `.deb` y su checksum, sin root ni descargas del builder.
+3. Instalación, ejecución y eliminación de ese paquete en Ubuntu 22.04 y 24.04.
+4. Solo para un `push` a `main`, firma OpenSSL del mismo archivo ya probado.
+5. Publicación automática de una prerelease en GitHub Releases, con `.deb`,
+   `.deb.sha256`, `.deb.sig` y `signing-public.pem`.
+
+No hace falta crear etiquetas, ejecutar Actions manualmente ni usar la API de
+GitHub desde tu equipo. Para descargar los paquetes publicados, abre
+[Releases](https://github.com/ml0renz0/ae5ctl/releases).
+
+Los tests y los paquetes de las PR no reciben las claves de firma ni pueden
+publicar releases. Los permisos `contents: write` solo se conceden al job de
+publicación, condicionado a `main`. La release se crea como borrador, se suben
+todos los archivos y después se publica; un fallo de subida no deja una release
+pública incompleta.
+
+### Versiones y reejecuciones
+
+La versión Python sigue en `pyproject.toml`. CI/CD añade una revisión Debian
+`1+ci.<número-de-ejecución>.<intento>`, por ejemplo
+`0.1.0~dev0-1+ci.12.1`. Así, dos builds del mismo upstream no tienen la misma
+versión y APT puede ordenarlos correctamente. La release usa una etiqueta
+automática `build-<id-de-ejecución>-<intento>`, vinculada al SHA exacto que pasó
+las comprobaciones. No se modifica `pyproject.toml` ni se crea un commit de
+versión en el proceso.
+
+Las ejecuciones en `main` no cancelan una publicación que ya esté en curso. Si
+se reejecuta únicamente publicación, se descarga el paquete previamente probado;
+no se recompila. Las releases son de desarrollo mientras siga pendiente la
+validación física de la AE-5.
+
+### Secretos de firma
+
+Los secretos del repositorio usados por el job de publicación son:
 
 - `DEB_SIGNING_KEY`: contenido PEM de tu clave privada cifrada.
 - `DEB_SIGNING_PASSWORD`: contraseña de esa clave.
 
-Puedes lanzar la construcción firmada usando únicamente Git, sin acceder a la
-API de GitHub desde tu equipo:
-
-```bash
-git tag deb-0.1.0-dev0-build1
-git push origin deb-0.1.0-dev0-build1
-```
-
-Usa una etiqueta nueva para cada construcción. Esto no publica una release. La
-ejecución aparecerá en la pestaña Actions del repositorio; al terminar, descarga
-el artefacto `ae5ctl-deb`. La ejecución manual requiere que el workflow se haya
-incorporado antes a la rama predeterminada.
-
-La firma solo se ejecuta al solicitarla mediante etiqueta o `sign`. Si falta algún secreto o la clave no
-funciona, el job falla; no publica un paquete presentado como firmado. Los
+La firma se ejecuta automáticamente tras las comprobaciones de `main`. Si falta
+algún secreto o la clave no funciona, el job falla antes de crear la release. Los
 archivos privados se crean en el directorio temporal del runner, con permisos
-restringidos, y se eliminan al terminar el paso. El artefacto contiene solamente
-el `.deb`, su `.sha256` y, si se firmó, el `.sig` y la clave pública.
+restringidos, y se eliminan al terminar el paso. Se publican solamente el `.deb`,
+su checksum, la firma y la clave pública. Las claves privadas nunca forman parte
+de los artefactos.
 
 Las claves temporales usadas en los tests son exclusivamente de prueba y no se
-conservan como claves de distribución. La firma con tu identidad queda pendiente
-hasta que proporciones los secretos por la configuración segura de GitHub.
+conservan como claves de distribución. Los secretos se suministran por la
+configuración segura de GitHub, nunca mediante el chat.

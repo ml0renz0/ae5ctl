@@ -34,10 +34,12 @@ comportamiento. No se pospone íntegramente a una release final.
 ## Empaquetado adelantado
 
 A petición del usuario, se adelanta de la fase 05 la generación de paquetes
-`.deb` de la CLI actual y su firma separada con una clave OpenSSL cifrada. Las
+`.deb` de la CLI actual, su firma con una clave OpenSSL cifrada y su publicación
+automática mediante CI/CD tras superar las comprobaciones de `main`. Las
 instrucciones están en [Paquetes .deb y firma OpenSSL](deb-packages.md). Esto no
-añade funcionalidades de audio ni resuelve la suspensión. La publicación de
-versiones, la elección de licencia y un posible repositorio APT siguen pendientes.
+añade funcionalidades de audio ni resuelve la suspensión. Las compilaciones se
+publican como prereleases; la elección de licencia, la validación con hardware y
+un posible repositorio APT siguen pendientes.
 
 ## Estado de la fase 01
 
