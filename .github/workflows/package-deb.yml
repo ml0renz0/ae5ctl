@@ -1,6 +1,9 @@
 name: Debian package
 
 on:
+  push:
+    tags:
+      - "deb-*"
   workflow_dispatch:
     inputs:
       sign:
@@ -31,7 +34,7 @@ jobs:
               "$image" sh -ec 'set -- /packages/*.deb; test "$#" -eq 1; sh /smoke_deb.sh "$1"'
           done
       - name: Sign and verify with OpenSSL
-        if: ${{ inputs.sign }}
+        if: ${{ github.event_name == 'push' || inputs.sign }}
         shell: bash
         env:
           DEB_SIGNING_KEY: ${{ secrets.DEB_SIGNING_KEY }}

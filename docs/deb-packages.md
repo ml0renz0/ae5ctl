@@ -111,17 +111,32 @@ no comprueba este `.sig` automáticamente.
 
 ## GitHub Actions
 
-El workflow **Debian package** se ejecuta manualmente desde Actions. Genera el
+El workflow **Debian package** se ejecuta al subir una etiqueta `deb-*` o
+manualmente desde Actions. Las etiquetas de construcción solicitan siempre firma;
+la ejecución manual permite elegirla con `sign`. Genera el
 paquete, comprueba instalación y eliminación en contenedores Ubuntu 22.04 y
 24.04, y guarda el artefacto `ae5ctl-deb`. No publica releases ni un repositorio
 APT.
 
-Para activar su opción `sign`, configura estos secretos del repositorio:
+Para la firma, configura estos secretos del repositorio:
 
 - `DEB_SIGNING_KEY`: contenido PEM de tu clave privada cifrada.
 - `DEB_SIGNING_PASSWORD`: contraseña de esa clave.
 
-La firma solo se ejecuta al solicitarla. Si falta algún secreto o la clave no
+Puedes lanzar la construcción firmada usando únicamente Git, sin acceder a la
+API de GitHub desde tu equipo:
+
+```bash
+git tag deb-0.1.0-dev0-build1
+git push origin deb-0.1.0-dev0-build1
+```
+
+Usa una etiqueta nueva para cada construcción. Esto no publica una release. La
+ejecución aparecerá en la pestaña Actions del repositorio; al terminar, descarga
+el artefacto `ae5ctl-deb`. La ejecución manual requiere que el workflow se haya
+incorporado antes a la rama predeterminada.
+
+La firma solo se ejecuta al solicitarla mediante etiqueta o `sign`. Si falta algún secreto o la clave no
 funciona, el job falla; no publica un paquete presentado como firmado. Los
 archivos privados se crean en el directorio temporal del runner, con permisos
 restringidos, y se eliminan al terminar el paso. El artefacto contiene solamente
