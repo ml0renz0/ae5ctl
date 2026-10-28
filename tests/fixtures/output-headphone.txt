@@ -1,0 +1,5 @@
+numid=37,iface=MIXER,name='Output Select'
+  ; type=ENUMERATED,access=rw------,values=1,items=2
+  ; Item #0 'Headphone'
+  ; Item #1 'Speakers'
+  : values=0

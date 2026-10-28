@@ -1,0 +1,190 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  merge_group:
+    types:
+      - checks_requested
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  tests:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install development tools
+        run: python -m pip install -e . -r requirements-dev.txt
+      - name: Lint
+        run: python -m ruff check .
+      - name: Check formatting
+        run: python -m ruff format --check .
+      - name: Test without audio hardware or desktop
+        run: python -m pytest
+
+  package:
+    name: Build Debian package
+    needs: tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build a unique Debian revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 packaging/build_deb.py \
+            --revision "1+ci.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          cd dist
+          sha256sum -c ./*.deb.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ae5ctl-deb-unsigned
+          if-no-files-found: error
+          path: |
+            dist/*.deb
+            dist/*.deb.sha256
+
+  smoke:
+    name: Install and remove on ${{ matrix.image }}
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:22.04", "ubuntu:24.04"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: ae5ctl-deb-unsigned
+          path: dist
+      - name: Verify artifact and test a disposable Ubuntu container
+        shell: bash
+        env:
+          UBUNTU_IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum -c ./*.deb.sha256)
+          docker run --rm \
+            --mount "type=bind,src=$PWD/dist,dst=/packages,readonly" \
+            --mount "type=bind,src=$PWD/packaging/smoke_deb.sh,dst=/smoke_deb.sh,readonly" \
+            "$UBUNTU_IMAGE" sh -ec \
+            'set -- /packages/*.deb; test "$#" -eq 1; sh /smoke_deb.sh "$1"'
+
+  required:
+    name: CI required
+    needs: [tests, package, smoke]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require all validation jobs to succeed
+        env:
+          TESTS_RESULT: ${{ needs.tests.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: |
+          if [[ "$TESTS_RESULT" != success || "$PACKAGE_RESULT" != success || "$SMOKE_RESULT" != success ]]; then
+            echo 'Tests, Debian build and both Ubuntu smoke tests must succeed.' >&2
+            exit 1
+          fi
+
+  publish:
+    name: Sign and publish development release
+    needs: [required, package]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: ae5ctl-deb-unsigned
+          path: dist
+      - name: Sign and verify the tested package with OpenSSL
+        shell: bash
+        env:
+          DEB_SIGNING_KEY: ${{ secrets.DEB_SIGNING_KEY }}
+          DEB_SIGNING_PASSWORD: ${{ secrets.DEB_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$DEB_SIGNING_KEY" || -z "$DEB_SIGNING_PASSWORD" ]]; then
+            echo 'Missing DEB_SIGNING_KEY or DEB_SIGNING_PASSWORD repository secret.' >&2
+            exit 1
+          fi
+          (cd dist && sha256sum -c ./*.deb.sha256)
+          packages=(dist/*.deb)
+          [[ ${#packages[@]} -eq 1 && -f "${packages[0]}" ]]
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/ae5ctl-signing.XXXXXX")
+          trap 'rm -rf -- "$signing_dir"' EXIT
+          printf '%s' "$DEB_SIGNING_KEY" > "$signing_dir/private.pem"
+          printf '%s' "$DEB_SIGNING_PASSWORD" > "$signing_dir/password"
+          unset DEB_SIGNING_KEY DEB_SIGNING_PASSWORD
+          /usr/bin/python3 packaging/sign_deb.py "${packages[0]}" \
+            --key "$signing_dir/private.pem" \
+            --passphrase-file "$signing_dir/password" \
+            --public-key-output dist/signing-public.pem
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ae5ctl-deb-signed
+          if-no-files-found: error
+          path: |
+            dist/*.deb
+            dist/*.deb.sha256
+            dist/*.deb.sig
+            dist/signing-public.pem
+      - name: Publish only after every signed asset has been uploaded
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          packages=(dist/*.deb)
+          [[ ${#packages[@]} -eq 1 && -f "${packages[0]}" ]]
+          package=${packages[0]}
+          version=$(dpkg-deb --field "$package" Version)
+          tag="build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          notes="$RUNNER_TEMP/ae5ctl-release-notes.md"
+          printf 'Automated development build of commit `%s`.\n\n' "$GITHUB_SHA" > "$notes"
+          printf 'Includes the tested Debian package, SHA-256 checksum, OpenSSL signature and public key.\n' >> "$notes"
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "ae5ctl $version" \
+            --notes-file "$notes" --draft --prerelease
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" \
+            "$package" "$package.sha256" "$package.sig" dist/signing-public.pem
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
+            --draft=false --prerelease --latest=false

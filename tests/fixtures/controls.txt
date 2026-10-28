@@ -1,0 +1,2 @@
+numid=12,iface=MIXER,name='Master Playback Volume'
+numid=37,iface=MIXER,name='Output Select'

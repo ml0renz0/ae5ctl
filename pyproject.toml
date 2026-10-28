@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ae5ctl"
+version = "0.1.0.dev0"
+description = "Read-only ALSA diagnostics for Sound BlasterX AE-5 on Linux"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+ae5ctl = "ae5ctl.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+xfail_strict = true
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+# Preserve the original script while characterizing its behavior.
+extend-exclude = ["ae5-switcher.py"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
