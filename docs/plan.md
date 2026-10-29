@@ -35,6 +35,10 @@ El flujo de integración es TBD: ramas cortas y PR hacia `main`, con revisión y
 el check `CI required` antes de fusionar. No se hace push directo a `main`.
 La publicación automática ocurre después de integrar, desde `main`.
 
+Se reutiliza la rama `codex/ae5ctl-deb-signing`, partiendo de `main` para cada
+PR. Tras fusionar se elimina la rama remota; el borrado comprueba que su punta
+sigue siendo la integrada para conservar cualquier trabajo posterior.
+
 ## Empaquetado adelantado
 
 A petición del usuario, se adelanta de la fase 05 la generación de paquetes

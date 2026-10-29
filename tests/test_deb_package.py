@@ -81,7 +81,7 @@ def test_metadata_matches_project_and_declares_runtime_dependencies(archive):
     assert "github.com/ml0renz0/ae5ctl" in metadata["Homepage"]
     assert metadata["Maintainer"]
     assert int(metadata["Installed-Size"]) > 0
-    assert archive.name == f"ae5ctl_{metadata['Version']}_all.deb"
+    assert archive.name == f"ae5ctl_{project['version']}-1_all.deb"
 
 
 def test_archive_has_root_ownership_and_safe_permissions(archive):
@@ -147,6 +147,41 @@ def test_package_checksums_cover_payload_and_archive(archive, extracted):
     assert entries.keys() == files
     checksum = archive.with_suffix(".deb.sha256").read_text().split()
     assert checksum == [hashlib.sha256(archive.read_bytes()).hexdigest(), archive.name]
+
+
+@pytest.mark.skipif(shutil.which("sha256sum") is None, reason="requires sha256sum")
+def test_release_asset_names_preserve_checksums_after_download(archive, tmp_path):
+    output = tmp_path / "revisions"
+    for revision in ("1~x", "1.x"):
+        result = build(output, extra=("--revision", revision))
+        assert result.returncode == 0, result.stderr
+    archives = [archive, *sorted(output.glob("*.deb"))]
+    assert len(archives) == 3, "Distinct revisions must not overwrite each other"
+    upstream = dpkg("--field", archive, "Version").strip().rsplit("-", 1)[0]
+    assert {dpkg("--field", path, "Version").strip() for path in archives} == {
+        f"{upstream}-1",
+        f"{upstream}-1~x",
+        f"{upstream}-1.x",
+    }
+
+    downloaded = tmp_path / "downloaded"
+    downloaded.mkdir()
+    for package in archives:
+        for asset in (package, package.with_suffix(".deb.sha256")):
+            # Reproduce the observed GitHub Releases filename normalization.
+            destination = downloaded / asset.name.replace("~", ".")
+            assert not destination.exists(), "Release asset names must not collide"
+            shutil.copyfile(asset, destination)
+    for checksum in downloaded.glob("*.sha256"):
+        result = subprocess.run(
+            ["sha256sum", "-c", checksum.name],
+            cwd=downloaded,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_extracted_python_module_runs_without_installed_project(extracted, tmp_path):

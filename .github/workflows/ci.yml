@@ -186,5 +186,16 @@ jobs:
             --notes-file "$notes" --draft --prerelease
           gh release upload "$tag" --repo "$GITHUB_REPOSITORY" \
             "$package" "$package.sha256" "$package.sig" dist/signing-public.pem
+          download_dir=$(mktemp -d "$RUNNER_TEMP/ae5ctl-download.XXXXXX")
+          trap 'rm -rf -- "$download_dir"' EXIT
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+            --dir "$download_dir"
+          for asset in "$package" "$package.sha256" "$package.sig" dist/signing-public.pem; do
+            cmp -- "$asset" "$download_dir/${asset##*/}"
+          done
+          (cd "$download_dir" && sha256sum -c ./*.deb.sha256)
+          openssl dgst -sha256 -verify "$download_dir/signing-public.pem" \
+            -signature "$download_dir/${package##*/}.sig" \
+            "$download_dir/${package##*/}"
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
             --draft=false --prerelease --latest=false

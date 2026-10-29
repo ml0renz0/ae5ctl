@@ -1,0 +1,58 @@
+name: Delete merged work branch
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions:
+  contents: read
+
+jobs:
+  delete-branch:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/ae5ctl-deb-signing'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          # The temporary job credential is needed for the guarded branch deletion.
+          persist-credentials: true
+      - name: Delete only the branch head merged by this PR
+        shell: bash
+        env:
+          MERGED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGED_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          branch_ref=refs/heads/codex/ae5ctl-deb-signing
+          if [[ "$MERGED_HEAD_REF" != "${branch_ref#refs/heads/}" ]]; then
+            echo 'This PR does not use the managed work branch.'
+            exit 0
+          fi
+          current_sha=$(git ls-remote --refs origin "$branch_ref" | awk '{print $1}')
+          if [[ -z "$current_sha" ]]; then
+            echo 'The work branch has already been deleted.'
+            exit 0
+          fi
+          if [[ "$current_sha" != "$MERGED_HEAD_SHA" ]]; then
+            echo 'The work branch has advanced; keep it for the next PR.'
+            exit 0
+          fi
+          if git push --force-with-lease="$branch_ref:$MERGED_HEAD_SHA" origin ":$branch_ref"; then
+            exit 0
+          fi
+          current_sha=$(git ls-remote --refs origin "$branch_ref" | awk '{print $1}')
+          if [[ "$current_sha" != "$MERGED_HEAD_SHA" ]]; then
+            echo 'The work branch changed during deletion; leave its current state intact.'
+            exit 0
+          fi
+          exit 1
