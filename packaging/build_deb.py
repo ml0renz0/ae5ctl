@@ -178,7 +178,10 @@ def build_deb(
         raise ValueError("No se encuentra dpkg-deb; instale el paquete dpkg.")
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    result = output_dir / f"{PACKAGE}_{version}_all.deb"
+    # GitHub Releases normalizes '~' in asset names. Keep Debian ordering in
+    # metadata, and escape revision tildes with '_' (not accepted in the input).
+    filename_revision = revision.replace("~", "_")
+    result = output_dir / f"{PACKAGE}_{project['version']}-{filename_revision}_all.deb"
     with tempfile.TemporaryDirectory(prefix=".ae5ctl-build-", dir=output_dir) as work:
         stage = Path(work) / "root"
         stage.mkdir()

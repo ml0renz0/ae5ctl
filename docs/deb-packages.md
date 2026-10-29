@@ -23,6 +23,13 @@ mismo código upstream:
 python3 packaging/build_deb.py --revision 2 --output-dir dist
 ```
 
+El archivo usa la versión Python: `ae5ctl_0.1.0.dev0-1_all.deb`. El campo
+`Version` interno conserva `0.1.0~dev0-1`; APT usa ese campo para ordenar las
+versiones. GitHub Releases sustituye `~` en los nombres de archivos, lo que
+rompería la referencia del checksum tras la descarga. Por eso el nombre usa
+`.devN` y, si una revisión contiene `~`, lo representa como `_`. Como `_` no se
+admite en la revisión de entrada, `1~x` y `1.x` generan nombres distintos.
+
 La arquitectura `all` significa que el contenido Python es independiente de la
 CPU; la instalación necesita Linux con Python >= 3.10 y `alsa-utils`. La CLI se
 instala en `/usr/bin/ae5ctl`, los módulos en
@@ -32,8 +39,8 @@ bytecode Python; no modifican el audio.
 
 ```bash
 cd dist
-sha256sum -c ae5ctl_0.1.0~dev0-1_all.deb.sha256
-sudo apt install ./ae5ctl_0.1.0~dev0-1_all.deb
+sha256sum -c ae5ctl_0.1.0.dev0-1_all.deb.sha256
+sudo apt install ./ae5ctl_0.1.0.dev0-1_all.deb
 ae5ctl --help
 ae5ctl doctor --json
 sudo apt remove ae5ctl
@@ -49,7 +56,7 @@ mismo contenido, fecha, versión y herramientas producen el mismo archivo:
 ```bash
 SOURCE_DATE_EPOCH=1700000000 python3 packaging/build_deb.py --output-dir /tmp/deb-a
 SOURCE_DATE_EPOCH=1700000000 python3 packaging/build_deb.py --output-dir /tmp/deb-b
-cmp /tmp/deb-a/ae5ctl_0.1.0~dev0-1_all.deb /tmp/deb-b/ae5ctl_0.1.0~dev0-1_all.deb
+cmp /tmp/deb-a/ae5ctl_0.1.0.dev0-1_all.deb /tmp/deb-b/ae5ctl_0.1.0.dev0-1_all.deb
 ```
 
 ## Clave privada cifrada
@@ -80,7 +87,7 @@ read -r -s -p 'Contraseña de la clave: ' signing_password
 printf '\n'
 printf '%s' "$signing_password" > "$password_file"
 unset signing_password
-python3 packaging/sign_deb.py dist/ae5ctl_0.1.0~dev0-1_all.deb \
+python3 packaging/sign_deb.py dist/ae5ctl_0.1.0.dev0-1_all.deb \
   --key "$HOME/.config/ae5ctl/signing/private.pem" \
   --passphrase-file "$password_file" \
   --public-key-output dist/signing-public.pem
@@ -100,8 +107,8 @@ antes de instalarlo:
 
 ```bash
 openssl dgst -sha256 -verify signing-public.pem \
-  -signature ae5ctl_0.1.0~dev0-1_all.deb.sig \
-  ae5ctl_0.1.0~dev0-1_all.deb
+  -signature ae5ctl_0.1.0.dev0-1_all.deb.sig \
+  ae5ctl_0.1.0.dev0-1_all.deb
 ```
 
 El resultado debe ser `Verified OK` y código de salida 0. Un checksum SHA-256
@@ -138,8 +145,8 @@ GitHub desde tu equipo. Para descargar los paquetes publicados, abre
 Los tests y los paquetes de las PR no reciben las claves de firma ni pueden
 publicar releases. Los permisos `contents: write` solo se conceden al job de
 publicación, condicionado a `main`. La release se crea como borrador, se suben
-todos los archivos y después se publica; un fallo de subida no deja una release
-pública incompleta.
+todos los archivos y se descargan de nuevo para verificar checksum y firma antes
+de publicarla. Un fallo de subida o verificación impide publicar el borrador.
 
 ### Versiones y reejecuciones
 

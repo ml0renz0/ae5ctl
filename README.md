@@ -98,14 +98,16 @@ python3 packaging/build_deb.py
 ```
 
 El generador requiere Python 3.11 o posterior y `dpkg-deb` (paquete `dpkg`). El
-paquete resultante es `dist/ae5ctl_0.1.0~dev0-1_all.deb`, con su checksum
+paquete resultante es `dist/ae5ctl_0.1.0.dev0-1_all.deb`, con su checksum
 `.deb.sha256`. Instala la CLI con Python del sistema y declara `python3 >= 3.10`
 y `alsa-utils` como dependencias. No incluye el script gráfico original.
+El nombre conserva la versión Python; el campo `Version` del paquete mantiene
+`0.1.0~dev0-1` para respetar el orden de versiones Debian.
 
 En Ubuntu, instala el archivo local con APT para resolver las dependencias:
 
 ```bash
-sudo apt install ./dist/ae5ctl_0.1.0~dev0-1_all.deb
+sudo apt install ./dist/ae5ctl_0.1.0.dev0-1_all.deb
 ae5ctl doctor --json
 sudo apt remove ae5ctl
 ```

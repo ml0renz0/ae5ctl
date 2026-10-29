@@ -56,6 +56,8 @@ def test_ci_revisions_follow_debian_upgrade_order(debian_version, older, newer):
 
 
 def test_ci_revision_is_preserved_in_the_installable_archive(tmp_path):
+    import tomllib
+
     revision = "1+ci.10.2"
     result = subprocess.run(
         [
@@ -83,5 +85,6 @@ def test_ci_revision_is_preserved_in_the_installable_archive(tmp_path):
     ).stdout.strip()
 
     assert version.endswith("-" + revision)
-    assert archive.name == f"ae5ctl_{version}_all.deb"
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    assert archive.name == f"ae5ctl_{project['version']}-{revision}_all.deb"
     assert archive.with_suffix(".deb.sha256").is_file()
