@@ -8,6 +8,7 @@ from dataclasses import asdict
 
 from ae5ctl import __version__
 from ae5ctl.alsa import AlsaBackend, AlsaError, Status, SwitchResult
+from ae5ctl.audio_session import inspect_audio_session
 
 SELECTION_ERRORS = {
     "no_card",
@@ -21,7 +22,7 @@ SELECTION_ERRORS = {
 DIAGNOSTIC_NOTES = [
     "El comando doctor es de solo lectura; no modifica controles ni perfiles.",
     "La selección ALSA no demuestra que salga audio por el conector esperado.",
-    "No se inspeccionan perfiles ni rutas PipeWire/WirePlumber.",
+    "La lectura ALSA no revela las rutas del servidor de audio.",
 ]
 
 
@@ -94,7 +95,8 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl switch speakers      Selecciona altavoces\n"
             "  ae5ctl toggle               Alterna ambas salidas\n"
             "  ae5ctl tray                  Indicador de bandeja (GTK/Ayatana)\n"
-            "  ae5ctl doctor --json        Diagnóstico estructurado\n\n"
+            "  ae5ctl doctor --json        Diagnóstico ALSA estructurado\n"
+            "  ae5ctl doctor --pipewire    Inspección del servidor de audio\n\n"
             "La conmutación NO restaura perfiles de volumen, ganancia ni DSP.\n"
             "La lectura ALSA no garantiza que el audio sea audible.\n\n"
             "AYUDA DETALLADA\n"
@@ -134,9 +136,10 @@ def parser() -> argparse.ArgumentParser:
             "Diagnostica la detección y lectura ALSA, sin reparar el audio.",
             "EJEMPLOS\n"
             "  ae5ctl doctor\n"
-            "  ae5ctl doctor --card Creative --json\n\n"
-            "No modifica perfiles PipeWire, controles ALSA ni servicios.\n"
-            "El diagnóstico PipeWire/WirePlumber todavía no está implementado.",
+            "  ae5ctl doctor --card Creative --json\n"
+            "  ae5ctl doctor --pipewire --json\n\n"
+            "--pipewire usa pactl (PipeWire o PulseAudio).\n"
+            "Es una lectura opcional; no modifica perfiles ni rutas.",
         ),
         "switch": (
             "Selecciona auriculares o altavoces modificando solo el control ALSA.",
@@ -190,6 +193,12 @@ def parser() -> argparse.ArgumentParser:
                 default=5,
                 metavar="SEGUNDOS",
                 help="refresco automático en segundos (predeterminado: 5)",
+            )
+        if name == "doctor":
+            command.add_argument(
+                "--pipewire",
+                action="store_true",
+                help="consultar servidor y salidas mediante pactl (solo lectura)",
             )
         if name == "switch":
             command.add_argument(
@@ -282,6 +291,8 @@ def doctor(backend: AlsaBackend, args: argparse.Namespace) -> int:
     except AlsaError as error:
         report["errors"].append(error_dict(error))
         result = exit_code(error)
+    if args.pipewire:
+        report["audio_session"] = inspect_audio_session(timeout=args.timeout)
     if args.json:
         print_json(report)
     else:
@@ -295,6 +306,26 @@ def doctor(backend: AlsaBackend, args: argparse.Namespace) -> int:
             print_status(report["status"])
         for error in report["errors"]:
             print_error(AlsaError(error["code"], error["message"]))
+        if args.pipewire:
+            session = report["audio_session"]
+            if session["available"]:
+                print(
+                    f"Servidor de audio: {session['server_name'] or 'desconocido'}"
+                )
+                print(
+                    f"Salida predeterminada: "
+                    f"{session['default_sink'] or 'no indicada'}"
+                )
+                for sink in session["sinks"]:
+                    print(f"Salida disponible: {sink['name']} ({sink['state']})")
+                for card in session["cards"]:
+                    print(f"Tarjeta del servidor: {card['name']}")
+            else:
+                print("Servidor de audio: pactl no disponible o sin conexión.")
+            for issue in session["errors"]:
+                print(f"Aviso audio [{issue['code']}]: {issue['message']}")
+            for note in session["notes"]:
+                print(note)
         for note in report["notes"]:
             print(note)
     return result
