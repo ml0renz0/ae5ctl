@@ -17,13 +17,25 @@ deja de funcionar correctamente y se recupera al cambiar estéreo → 5.1 → es
 en Ajustes → Sonido. Este síntoma no determina si el fallo está en ALSA, el
 controlador, PipeWire, PulseAudio o el gestor de sesión.
 
+## Decisión de arquitectura (noviembre de 2026)
+
+Se mantiene ALSA para los controles físicos específicos de Creative y se prevé
+incorporar PipeWire/WirePlumber para observar perfiles, puertos y rutas. No se
+cambiará el backend a PipeWire sin comprobar primero qué capa controla realmente
+el selector de la AE-5. La CLI de lectura seguirá funcionando sin escritorio.
+
+La incidencia de suspensión documentada ocurrió antes de una actualización de
+Ubuntu. Tras actualizar, el usuario todavía no ha observado que se reproduzca.
+Por tanto no se implementa recuperación automática ni se prioriza su investigación:
+el procedimiento de capturas posterior solo se activará si reaparece el fallo.
+
 ## Fases
 
 | Fase | Trabajo | Evidencia para completarla |
 | --- | --- | --- |
 | 00 · Base | Preservar el original, documentar el alcance, preparar herramientas, tests y CI. | Las pruebas se ejecutan sin GTK ni hardware; el original permanece intacto y los defectos conocidos quedan explícitos. |
 | 01 · Lectura ALSA y diagnóstico | Separar la lectura del estado de la interfaz, interpretar enumerados, seleccionar la tarjeta sin ambigüedad y ofrecer una CLI mínima de consulta. | Tests de controles, errores y tarjeta ausente; contraste temprano con salidas reales de la AE-5. |
-| 02 · Suspensión | Comparar el audio antes de suspender, tras el fallo y después de recuperarlo desde los ajustes de Ubuntu. | Diferencias reproducibles, registros relevantes y una hipótesis comprobada o límites de la investigación documentados. |
+| 02 · Suspensión (condicional) | Investigar únicamente si vuelve a reproducirse tras la actualización de Ubuntu. | Capturas comparables antes del fallo, durante él y tras recuperarlo; no introducir hooks especulativos. |
 | 03 · Conmutación y perfiles | Implementar `switch` y `toggle`, acotar comandos a la tarjeta seleccionada y comparar los perfiles existentes antes de decidir el modo predeterminado. | Errores y tiempos límite controlados, verificación posterior de la selección y pruebas con hardware sin alterar otras tarjetas. |
 | 04 · Bandeja | Conectar la interfaz al motor, adaptar el indicador a Ayatana y evitar bloqueos de la sesión gráfica. | Comprobación gráfica, errores visibles y actualización de estado coherente con la CLI. |
 | 05 · Instalación y validación | Documentar instalación, uso y recuperación; añadir distribución y arranque automático cuando el flujo sea fiable. | Comprobación en Ubuntu con auriculares, altavoces y varios ciclos de suspensión; límites conocidos documentados antes de publicar. |
@@ -48,6 +60,14 @@ instrucciones están en [Paquetes .deb y firma OpenSSL](deb-packages.md). Esto n
 añade funcionalidades de audio ni resuelve la suspensión. Las compilaciones se
 publican como prereleases; la elección de licencia, la validación con hardware y
 un posible repositorio APT siguen pendientes.
+
+## Usabilidad de CLI (PR de seguimiento)
+
+Se añade ayuda general y por subcomando con ejemplos, versión, códigos de salida,
+restricciones de solo lectura y sugerencias en errores de texto. El formato JSON
+y sus códigos de salida permanecen estables; las pruebas verifican el contenido
+de la ayuda sin acceder a ALSA. Tras esta mejora, la siguiente prioridad funcional
+es implementar la conmutación de salidas, con validación en hardware.
 
 ## Estado de la fase 01
 
