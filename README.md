@@ -60,7 +60,10 @@ No se han probado todavía los cambios físicos en el equipo real.
 script original. Usa GTK 3 y AyatanaAppIndicator3, pero las consultas y los
 cambios ALSA se ejecutan en un hilo de trabajo; el menú se actualiza desde
 el hilo principal de GTK. Refresca el estado real cada cinco segundos y muestra
-los errores sin suponer que la última selección solicitada tuvo éxito.
+los errores sin suponer que la última selección solicitada tuvo éxito. Después
+de detectar la tarjeta y el selector una vez, reutiliza esos identificadores
+para evitar escanear todos los controles ALSA en cada ciclo. Si la consulta
+falla, descarta la caché y vuelve a detectar el hardware en el siguiente ciclo.
 
 En Ubuntu 22.04/24.04, instale las dependencias gráficas mediante APT:
 

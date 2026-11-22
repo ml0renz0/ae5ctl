@@ -31,6 +31,8 @@ class TrayController:
         self.state: str | None = None
         self.busy = False
         self.closed = False
+        self._resolved_card: str | None = None
+        self._resolved_numid: int | None = None
         self._lock = Lock()
 
     def request(self, operation: str) -> bool:
@@ -46,14 +48,27 @@ class TrayController:
         def worker() -> None:
             state: str | None = None
             error: str | None = None
+            resolved_card: str | None = None
+            resolved_numid: int | None = None
             try:
-                options = {"card": self.card, "numid": self.numid}
+                options = {
+                    "card": self.card or self._resolved_card,
+                    "numid": self.numid or self._resolved_numid,
+                }
                 if operation == "refresh":
-                    state = self.backend.status(**options).output
+                    status = self.backend.status(**options)
                 elif operation == "toggle":
-                    state = self.backend.toggle(**options).after.output
+                    status = self.backend.toggle(**options).after
                 else:
-                    state = self.backend.switch(operation, **options).after.output
+                    status = self.backend.switch(operation, **options).after
+                state = status.output
+                # Reuse the detected control: polling must not scan every
+                # ALSA mixer control again. Always resolve by card ID, not index.
+                card_info = getattr(status, "card", None)
+                control_info = getattr(status, "control", None)
+                if card_info is not None and control_info is not None:
+                    resolved_card = card_info.id
+                    resolved_numid = control_info.numid
             except Exception as exc:
                 # GUI thread boundaries must not leave the menu permanently busy.
                 error = str(exc) or type(exc).__name__
@@ -64,6 +79,9 @@ class TrayController:
                         return False
                     self.state = state
                     self.busy = False
+                    # Clear stale references after hardware disappears or fails.
+                    self._resolved_card = resolved_card
+                    self._resolved_numid = resolved_numid
                 self.on_update(state, error, False)
                 return False
 

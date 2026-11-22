@@ -134,3 +134,39 @@ def test_tray_reports_missing_desktop_dependency(monkeypatch, capsys):
     monkeypatch.setattr("ae5ctl.tray._load_gui", unavailable)
     assert run_tray() == 4
     assert "Instale Ayatana" in capsys.readouterr().err
+
+
+def test_discovered_selector_is_cached_and_recovered_after_failure(harness):
+    from ae5ctl.alsa import Card, EnumControl, Status
+
+    controller, backend, updates, _, _, finish = harness
+    controller.card = None
+    controller.numid = None
+    status = Status(
+        card=Card(7, "Creative", "Sound BlasterX AE-5"),
+        control=EnumControl(43, "Output Select", {0: "Speakers", 1: "Headphone"}, (1,)),
+        output="headphones",
+    )
+    backend.status.side_effect = [
+        status,
+        status,
+        RuntimeError("tarjeta desconectada"),
+        status,
+    ]
+
+    assert controller.request("refresh")
+    finish()
+    backend.status.assert_called_with(card=None, numid=None)
+
+    assert controller.request("refresh")
+    finish()
+    backend.status.assert_called_with(card="Creative", numid=43)
+
+    assert controller.request("refresh")
+    finish()
+    assert updates[-1] == (None, "tarjeta desconectada", False)
+
+    assert controller.request("refresh")
+    finish()
+    backend.status.assert_called_with(card=None, numid=None)
+    assert updates[-1] == ("headphones", None, False)
