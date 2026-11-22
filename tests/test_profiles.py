@@ -98,7 +98,7 @@ def test_diff_only_reports_changed_values_and_flags_volume(state_files):
         "value.1": "35",
     }
     assert by_name["Master Playback Volume"]["speakers"]["value.0"] == "80"
-    assert "restauración" in report["warnings"][0]
+    assert "no reproduce" in report["warnings"][0]
 
 
 def test_control_numbers_not_used_as_identity(state_files):
