@@ -45,6 +45,7 @@ ae5ctl switch headphones
 ae5ctl switch speakers
 ae5ctl toggle
 ae5ctl doctor --json
+ae5ctl doctor --pipewire --json  # Inspección opcional, solo lectura
 ```
 
 **Advertencia:** `switch` y `toggle` escriben únicamente el control enumerado
@@ -83,9 +84,15 @@ física. Tampoco restaura perfiles `alsactl` ni modifica PipeWire.
 
 Si `status` no identifica la tarjeta de forma inequívoca, use el ID mostrado en
 `cards` con `--card`; indique `--numid` únicamente si hay varios selectores
-o conoce su identificador. Las opciones PipeWire/WirePlumber todavía no se
-inspeccionan desde `doctor`. Los errores en formato texto muestran una sugerencia
-de resolución; las respuestas JSON conservan su estructura para automatizaciones.
+o conoce su identificador. El diagnóstico `doctor --pipewire` consulta `pactl`
+para conocer el servidor de audio, su salida predeterminada y las salidas/tarjetas
+disponibles. Identifica PipeWire mediante el nombre devuelto por el servidor,
+sin confundirlo con PulseAudio. **No inspecciona los perfiles detallados de
+WirePlumber ni garantiza correspondencia con el selector físico de la AE-5.**
+Si falta `pactl`, instale `pulseaudio-utils`; es una dependencia opcional.
+Las respuestas JSON de `doctor` solo incluyen `audio_session` cuando se indica
+`--pipewire`, y un fallo de esta inspección opcional no modifica el código de
+salida del diagnóstico ALSA.
 
 ## Instalación y consultas
 
@@ -118,7 +125,7 @@ Por ejemplo, tras sustituir los valores por los de tu equipo:
 .venv/bin/ae5ctl status --card ID_ALSA --numid 37 --timeout 5 --json
 ```
 
-`--timeout` limita cada operación `amixer`, en segundos. Los comandos
+`--timeout` limita cada operación `amixer` y `pactl`, en segundos. Los comandos
 de consulta y conmutación admiten `--json`; `tray` es únicamente gráfico. Los resultados y errores en JSON se escriben en la salida
 estándar; en modo texto, los errores se escriben en la salida de errores.
 `doctor` conserva las tarjetas ya leídas y explica los fallos de diagnóstico.
@@ -146,8 +153,8 @@ Después de la instalación anterior:
 .venv/bin/python -m ruff format --check .
 ```
 
-Las pruebas cubren el motor y la CLI nuevos, además de caracterizar el script
-original con dependencias y comandos simulados. No necesitan PyGObject, GTK, una
+Las pruebas cubren el motor ALSA, la inspección opcional del servidor de
+audio y la CLI, además de caracterizar el script original con dependencias y comandos simulados. No necesitan PyGObject, GTK, una
 sesión gráfica ni una tarjeta de sonido, y no deben escribir en ALSA. Las muestras
 ALSA sintéticas se identifican como tales; no demuestran cómo se comporta el
 hardware del usuario.
