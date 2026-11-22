@@ -32,6 +32,7 @@ ae5ctl cards --help       # Ayuda para listar dispositivos
 ae5ctl status --help      # Opciones --card, --numid y --timeout
 ae5ctl switch --help      # Seleccionar una salida con verificación
 ae5ctl toggle --help      # Alternar la salida física ALSA
+ae5ctl tray --help        # Indicador GTK/Ayatana opcional
 ae5ctl doctor --help      # Diagnóstico y limitaciones
 ```
 
@@ -52,6 +53,30 @@ de la tarjeta ALSA seleccionada. No restauran los perfiles
 perfiles de PipeWire o rutas de aplicaciones. Si el sonido dependía de esos
 ajustes, compare los perfiles originales antes de sustituir la aplicación GTK.
 No se han probado todavía los cambios físicos en el equipo real.
+
+## Indicador de bandeja (opcional)
+
+`ae5ctl tray` recupera el menú de auriculares, altavoces, alternar y salir del
+script original. Usa GTK 3 y AyatanaAppIndicator3, pero las consultas y los
+cambios ALSA se ejecutan en un hilo de trabajo; el menú se actualiza desde
+el hilo principal de GTK. Refresca el estado real cada cinco segundos y muestra
+los errores sin suponer que la última selección solicitada tuvo éxito.
+
+En Ubuntu 22.04/24.04, instale las dependencias gráficas mediante APT:
+
+```bash
+sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1
+ae5ctl tray
+ae5ctl tray --card Creative --interval 5
+```
+
+La instalación del paquete `.deb` no exige las dependencias gráficas para
+preservar el modo CLI sin escritorio. En un entorno virtual, cree el venv con
+`python3 -m venv --system-site-packages .venv` para acceder a `python3-gi`
+instalado con APT. El indicador necesita una sesión gráfica y soporte de
+indicadores del escritorio; su aspecto puede variar entre GNOME y otras sesiones.
+No se configura arranque automático hasta validar el comportamiento en la AE-5
+física. Tampoco restaura perfiles `alsactl` ni modifica PipeWire.
 
 Si `status` no identifica la tarjeta de forma inequívoca, use el ID mostrado en
 `cards` con `--card`; indique `--numid` únicamente si hay varios selectores
@@ -90,8 +115,8 @@ Por ejemplo, tras sustituir los valores por los de tu equipo:
 .venv/bin/ae5ctl status --card ID_ALSA --numid 37 --timeout 5 --json
 ```
 
-`--timeout` limita cada operación `amixer`, en segundos. Todos los subcomandos
-admiten `--json`. Los resultados y errores en JSON se escriben en la salida
+`--timeout` limita cada operación `amixer`, en segundos. Los comandos
+de consulta y conmutación admiten `--json`; `tray` es únicamente gráfico. Los resultados y errores en JSON se escriben en la salida
 estándar; en modo texto, los errores se escriben en la salida de errores.
 `doctor` conserva las tarjetas ya leídas y explica los fallos de diagnóstico.
 

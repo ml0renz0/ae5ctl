@@ -93,6 +93,7 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl switch headphones    Selecciona auriculares\n"
             "  ae5ctl switch speakers      Selecciona altavoces\n"
             "  ae5ctl toggle               Alterna ambas salidas\n"
+            "  ae5ctl tray                  Indicador de bandeja (GTK/Ayatana)\n"
             "  ae5ctl doctor --json        Diagnóstico estructurado\n\n"
             "La conmutación NO restaura perfiles de volumen, ganancia ni DSP.\n"
             "La lectura ALSA no garantiza que el audio sea audible.\n\n"
@@ -152,6 +153,15 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl toggle --card Creative --json\n\n"
             "No se basa en un archivo de último estado ni restaura perfiles.",
         ),
+        "tray": (
+            "Muestra un indicador GTK 3/Ayatana conectado al motor ALSA.",
+            "EJEMPLOS\n"
+            "  ae5ctl tray\n"
+            "  ae5ctl tray --card Creative --interval 5\n\n"
+            "Necesita una sesión gráfica, python3-gi y AyatanaAppIndicator3.\n"
+            "No restaura perfiles DSP ni cambia rutas PipeWire.\n"
+            "Las consultas y escrituras ALSA se ejecutan fuera del hilo GTK.",
+        ),
     }
     for name, help_text in [
         ("cards", "listar tarjetas ALSA y obtener sus ID"),
@@ -159,6 +169,7 @@ def parser() -> argparse.ArgumentParser:
         ("doctor", "diagnosticar la lectura ALSA (sin reparar audio)"),
         ("switch", "seleccionar auriculares o altavoces"),
         ("toggle", "alternar la salida ALSA"),
+        ("tray", "mostrar el indicador gráfico opcional"),
     ]:
         description, epilog = details[name]
         command = commands.add_parser(
@@ -168,9 +179,18 @@ def parser() -> argparse.ArgumentParser:
             epilog=epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
-        command.add_argument(
-            "--json", action="store_true", help="imprimir JSON para scripts"
-        )
+        if name != "tray":
+            command.add_argument(
+                "--json", action="store_true", help="imprimir JSON para scripts"
+            )
+        else:
+            command.add_argument(
+                "--interval",
+                type=positive_int,
+                default=5,
+                metavar="SEGUNDOS",
+                help="refresco automático en segundos (predeterminado: 5)",
+            )
         if name == "switch":
             command.add_argument(
                 "output",
@@ -286,6 +306,15 @@ def main(argv: list[str] | None = None) -> int:
         parser().print_help()
         return 0
     args = parser().parse_args(arguments)
+    if args.command == "tray":
+        from ae5ctl.tray import run_tray
+
+        return run_tray(
+            card=args.card,
+            numid=args.numid,
+            timeout=args.timeout,
+            interval=args.interval,
+        )
     backend = AlsaBackend(timeout=getattr(args, "timeout", 3.0))
     if args.command == "doctor":
         return doctor(backend, args)

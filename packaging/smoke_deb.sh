@@ -17,6 +17,8 @@ apt-get install -y --no-install-recommends "$1"
 test "$(dpkg-query -W -f='${Status}' ae5ctl)" = "install ok installed"
 ae5ctl --help
 python3 -m ae5ctl --help
+ae5ctl tray --help
+python3 -m ae5ctl tray --help
 ae5ctl cards --json > /tmp/ae5ctl-cards.json
 python3 - <<'PY'
 import json

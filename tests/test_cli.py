@@ -339,6 +339,7 @@ def test_no_arguments_displays_main_help_without_alsa(backend, capsys):
             ("--card", "--numid", "headphones", "speakers", "EJEMPLOS"),
         ),
         (["toggle", "--help"], ("--card", "--numid", "EJEMPLOS")),
+        (["tray", "--help"], ("--card", "--interval", "Ayatana", "EJEMPLOS")),
     ],
 )
 def test_help_explains_usage_without_accessing_hardware(
@@ -447,3 +448,25 @@ def test_write_failure_shows_recovery_hint(backend, capsys):
     assert cli.main(["toggle"]) == 4
     captured = capsys.readouterr()
     assert "ae5ctl status" in captured.err
+
+
+def test_tray_delegates_without_instantiating_cli_backend(backend, monkeypatch):
+    from ae5ctl import tray
+
+    _, factory = backend
+    start = Mock(return_value=0)
+    monkeypatch.setattr(tray, "run_tray", start)
+    assert cli.main(["tray", "--card", "Creative", "--interval", "7"]) == 0
+    start.assert_called_once_with(
+        card="Creative", numid=None, timeout=3.0, interval=7
+    )
+    factory.assert_not_called()
+
+
+@pytest.mark.parametrize("args", [["tray", "--json"], ["tray", "--interval", "0"]])
+def test_tray_invalid_args_fail_before_loading_gui(backend, capsys, args):
+    _, factory = backend
+    with pytest.raises(SystemExit) as error:
+        cli.main(args)
+    assert error.value.code == 2
+    factory.assert_not_called()

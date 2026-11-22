@@ -145,11 +145,14 @@ def stage_package(
         "Priority: optional\n"
         f"Maintainer: {MAINTAINER}\n"
         f"Depends: python3:any (>= {project['minimum_python']}), alsa-utils\n"
+        "Suggests: python3-gi, gir1.2-gtk-3.0, "
+        "gir1.2-ayatanaappindicator3-0.1\n"
         f"Installed-Size: {installed_size}\n"
         f"Homepage: {HOMEPAGE}\n"
         f"Description: {project['description']}\n"
         " Lists ALSA cards and reads enumerated headphone/speaker selectors.\n"
         " Includes read-only diagnostics and verified ALSA output switching.\n"
+        " Optional GTK/Ayatana tray is available with desktop bindings.\n"
         " This is a development build with hardware validation still pending.\n"
     )
     write_file(stage / "DEBIAN/control", control.encode("utf-8"))

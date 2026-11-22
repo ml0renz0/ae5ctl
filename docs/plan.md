@@ -37,7 +37,7 @@ el procedimiento de capturas posterior solo se activará si reaparece el fallo.
 | 01 · Lectura ALSA y diagnóstico | Separar la lectura del estado de la interfaz, interpretar enumerados, seleccionar la tarjeta sin ambigüedad y ofrecer una CLI mínima de consulta. | Tests de controles, errores y tarjeta ausente; contraste temprano con salidas reales de la AE-5. |
 | 02 · Suspensión (condicional) | Investigar únicamente si vuelve a reproducirse tras la actualización de Ubuntu. | Capturas comparables antes del fallo, durante él y tras recuperarlo; no introducir hooks especulativos. |
 | 03 · Conmutación y perfiles | Conmutación ALSA directa implementada en PR #4; comparar perfiles originales y validar en hardware físico. | Confirmar efectos del selector real y preservar DSP, ganancia y volumen; pruebas reales sin alterar otras tarjetas. |
-| 04 · Bandeja | Conectar la interfaz al motor, adaptar el indicador a Ayatana y evitar bloqueos de la sesión gráfica. | Comprobación gráfica, errores visibles y actualización de estado coherente con la CLI. |
+| 04 · Bandeja | Implementada bandeja GTK3/Ayatana opcional y asíncrona en PR #4; falta validación en una sesión GNOME real. | Comprobar iconos, menú y estado tras cambios externos sin bloquear el escritorio. |
 | 05 · Instalación y validación | Documentar instalación, uso y recuperación; añadir distribución y arranque automático cuando el flujo sea fiable. | Comprobación en Ubuntu con auriculares, altavoces y varios ciclos de suspensión; límites conocidos documentados antes de publicar. |
 
 La validación con hardware empieza en la fase 01 y continúa en cada cambio de
@@ -68,6 +68,15 @@ restricciones de solo lectura y sugerencias en errores de texto. El formato JSON
 y sus códigos de salida permanecen estables; las pruebas verifican el contenido
 de la ayuda sin acceder a ALSA. Tras esta mejora, la siguiente prioridad funcional
 es implementar la conmutación de salidas, con validación en hardware.
+
+## Bandeja GTK/Ayatana opcional (PR #4)
+
+El subcomando `ae5ctl tray` usa el motor ALSA existente con un controlador
+asíncrono de una operación a la vez; GLib actualiza los controles en el hilo
+principal. Las dependencias gráficas se importan únicamente al arrancar `tray`,
+de modo que las otras órdenes y CI continúan funcionando sin GTK. No hay
+autostart ni restauración de perfiles. Pendiente probar el indicador y el
+control de la tarjeta real en Ubuntu GNOME.
 
 ## Avance en conmutación (PR #4)
 
