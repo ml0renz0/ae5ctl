@@ -41,7 +41,9 @@ jobs:
       - name: Lint
         run: python -m ruff check .
       - name: Check formatting
-        run: python -m ruff format --check .
+        run: |
+          python -m ruff format --diff .
+          python -m ruff format --check .
       - name: Test without audio hardware or desktop
         run: python -m pytest
 
