@@ -20,7 +20,7 @@ EPOCH = "1700000000"
 pytestmark = [
     pytest.mark.package,
     pytest.mark.skipif(
-    sys.version_info < (3, 11)
+        sys.version_info < (3, 11)
         or sys.platform != "linux"
         or shutil.which("dpkg-deb") is None,
         reason="Debian archive checks require Linux, dpkg-deb and build Python >= 3.11",
