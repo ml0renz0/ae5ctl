@@ -202,7 +202,9 @@ def test_extracted_python_module_runs_without_installed_project(extracted, tmp_p
     )
 
     assert result.returncode == 0, result.stderr
-    assert "{cards,status,doctor}" in result.stdout
+    for command in ("cards", "status", "doctor"):
+        assert command in result.stdout
+    assert "EJEMPLOS" in result.stdout
     assert result.stderr == ""
 
 
