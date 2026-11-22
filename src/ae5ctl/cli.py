@@ -92,7 +92,10 @@ def parser() -> argparse.ArgumentParser:
         ),
     )
     root.add_argument(
-        "-V", "--version", action="version", version=f"%(prog)s {__version__}",
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
         help="mostrar la versión instalada y salir",
     )
     commands = root.add_subparsers(dest="command", required=True, metavar="COMANDO")
@@ -102,7 +105,7 @@ def parser() -> argparse.ArgumentParser:
             "EJEMPLOS\n"
             "  ae5ctl cards\n"
             "  ae5ctl cards --json\n\n"
-            "Use el ID entre corchetes en status --card ID_ALSA."
+            "Use el ID entre corchetes en status --card ID_ALSA.",
         ),
         "status": (
             "Lee la salida del selector de auriculares/altavoces de la AE-5.",
@@ -112,7 +115,7 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl status --card Creative --numid 37 --json\n\n"
             "Primero ejecute 'ae5ctl cards' para identificar el ID ALSA.\n"
             "Use --numid solo si hay varios selectores o conoce el control.\n"
-            "La selección ALSA no garantiza que se oiga audio."
+            "La selección ALSA no garantiza que se oiga audio.",
         ),
         "doctor": (
             "Diagnostica la detección y lectura ALSA, sin reparar el audio.",
@@ -120,7 +123,7 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl doctor\n"
             "  ae5ctl doctor --card Creative --json\n\n"
             "No modifica perfiles PipeWire, controles ALSA ni servicios.\n"
-            "El diagnóstico PipeWire/WirePlumber todavía no está implementado."
+            "El diagnóstico PipeWire/WirePlumber todavía no está implementado.",
         ),
     }
     for name, help_text in [
