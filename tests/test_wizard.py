@@ -5,8 +5,9 @@ import subprocess
 import wave
 from collections import deque
 
-from ae5ctl.wizard import Sink, choose_sink, discover_sinks, run_wizard
 from test_validation import FakeBackend
+
+from ae5ctl.wizard import Sink, choose_sink, discover_sinks, run_wizard
 
 
 def answers(*values):
