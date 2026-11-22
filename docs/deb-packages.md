@@ -1,6 +1,6 @@
 # Paquetes .deb y firma OpenSSL
 
-El paquete actual contiene la CLI de lectura ALSA. No incluye la bandeja GTK,
+El paquete contiene la CLI de lectura y conmutación del selector ALSA. No incluye la bandeja GTK,
 perfiles de audio, servicios, reglas de suspensión ni recuperación automática.
 La licencia sigue pendiente de elección. La publicación automática de builds
 no concede por sí misma permisos de redistribución del código.
