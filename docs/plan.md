@@ -64,10 +64,20 @@ un posible repositorio APT siguen pendientes.
 ## Usabilidad de CLI (PR de seguimiento)
 
 Se añade ayuda general y por subcomando con ejemplos, versión, códigos de salida,
-restricciones de solo lectura y sugerencias en errores de texto. El formato JSON
+advertencias sobre los comandos que escriben en ALSA y sugerencias en errores. El formato JSON
 y sus códigos de salida permanecen estables; las pruebas verifican el contenido
 de la ayuda sin acceder a ALSA. Tras esta mejora, la siguiente prioridad funcional
 es implementar la conmutación de salidas, con validación en hardware.
+
+## Inspección opcional del servidor de audio (PR #4)
+
+`ae5ctl doctor --pipewire` consulta únicamente `pactl info`,
+`pactl list short sinks` y `pactl list short cards`. Identifica si responde
+PipeWire a través de su capa compatible con PulseAudio, PulseAudio nativo u
+otro servidor. Informa de la salida predeterminada y dispositivos anunciados,
+sin deducir qué conector físico de la AE-5 utilizan. La ausencia de `pactl`
+es una advertencia opcional y no convierte una lectura ALSA correcta en fallo.
+No se modifica el audio ni se consulta todavía el grafo nativo de WirePlumber.
 
 ## Bandeja GTK/Ayatana opcional (PR #4)
 
