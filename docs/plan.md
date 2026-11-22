@@ -36,7 +36,7 @@ el procedimiento de capturas posterior solo se activará si reaparece el fallo.
 | 00 · Base | Preservar el original, documentar el alcance, preparar herramientas, tests y CI. | Las pruebas se ejecutan sin GTK ni hardware; el original permanece intacto y los defectos conocidos quedan explícitos. |
 | 01 · Lectura ALSA y diagnóstico | Separar la lectura del estado de la interfaz, interpretar enumerados, seleccionar la tarjeta sin ambigüedad y ofrecer una CLI mínima de consulta. | Tests de controles, errores y tarjeta ausente; contraste temprano con salidas reales de la AE-5. |
 | 02 · Suspensión (condicional) | Investigar únicamente si vuelve a reproducirse tras la actualización de Ubuntu. | Capturas comparables antes del fallo, durante él y tras recuperarlo; no introducir hooks especulativos. |
-| 03 · Conmutación y perfiles | Conmutación ALSA directa implementada en PR #4; comparar perfiles originales y validar en hardware físico. | Confirmar efectos del selector real y preservar DSP, ganancia y volumen; pruebas reales sin alterar otras tarjetas. |
+| 03 · Conmutación y perfiles | Conmutación ALSA directa y comparador de ficheros `.state` implementados en PR #4; falta ejecutarlo con perfiles reales y validar en hardware físico. | Determinar controles adicionales necesarios, sin modificar otras tarjetas, antes de sustituir el programa original. |
 | 04 · Bandeja | Implementada bandeja GTK3/Ayatana opcional y asíncrona en PR #4; falta validación en una sesión GNOME real. | Comprobar iconos, menú y estado tras cambios externos sin bloquear el escritorio. |
 | 05 · Instalación y validación | Documentar instalación, uso y recuperación; añadir distribución y arranque automático cuando el flujo sea fiable. | Comprobación en Ubuntu con auriculares, altavoces y varios ciclos de suspensión; límites conocidos documentados antes de publicar. |
 
@@ -68,6 +68,19 @@ advertencias sobre los comandos que escriben en ALSA y sugerencias en errores. E
 y sus códigos de salida permanecen estables; las pruebas verifican el contenido
 de la ayuda sin acceder a ALSA. Tras esta mejora, la siguiente prioridad funcional
 es implementar la conmutación de salidas, con validación en hardware.
+
+## Comparador de instantáneas alsactl (PR #4)
+
+`ae5ctl profiles diff` lee los dos ficheros `.state` del programa original
+sin ejecutar comandos ni acceder al hardware. Un parser delimitado y estricto
+reconoce bloques `state.*` y `control.*`, compara valores por identidad
+de control y advierte de cambios potenciales de volumen, muteo o DSP.
+Los números `control.N` no son identidad estable. Se muestran controles
+y tarjetas ausentes en uno de los perfiles, incluidas otras tarjetas
+restaurables por `alsactl`. La clasificación por nombre es orientativa.
+El parser rechaza entrada que no sabe interpretar, con tamaño máximo de 2 MiB.
+La validez de la comparación en los dos archivos *reales* sigue pendiente;
+no se guarda ni restaura el estado del audio.
 
 ## Inspección opcional del servidor de audio (PR #4)
 
