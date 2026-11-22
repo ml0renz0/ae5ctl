@@ -102,6 +102,17 @@ de modo que las otras órdenes y CI continúan funcionando sin GTK. No hay
 autostart ni restauración de perfiles. Pendiente probar el indicador y el
 control de la tarjeta real en Ubuntu GNOME.
 
+## Previsualización y protección de cambios ALSA (PR #4)
+
+`ae5ctl switch speakers --dry-run` y `ae5ctl toggle --dry-run` muestran
+el índice enumerado y comando `amixer cset` previsto, sin ejecutar cambios.
+El motor comparte la misma selección del control entre previsualización y
+escritura, comprueba que la tarjeta no haya cambiado entre lectura y escritura,
+y distingue la verificación posterior fallida de un cambio confirmado. Las
+pruebas de integración utilizan un dispositivo ALSA simulado para cubrir el
+recorrido CLI → backend → argumentos de `amixer`, incluidos hotplug y error
+tras escribir. La validación en hardware real permanece pendiente.
+
 ## Avance en conmutación (PR #4)
 
 `switch headphones`, `switch speakers` y `toggle` utilizan el selector ALSA
