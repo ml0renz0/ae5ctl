@@ -32,6 +32,7 @@ ae5ctl cards --help       # Ayuda para listar dispositivos
 ae5ctl status --help      # Opciones --card, --numid y --timeout
 ae5ctl switch --help      # Seleccionar una salida con verificación
 ae5ctl toggle --help      # Alternar la salida física ALSA
+ae5ctl switch speakers --dry-run --json # Previsualizar sin escribir
 ae5ctl tray --help        # Indicador GTK/Ayatana opcional
 ae5ctl doctor --help      # Diagnóstico y limitaciones
 ae5ctl profiles diff --help # Comparar perfiles alsactl guardados
@@ -42,6 +43,8 @@ Para descubrir la tarjeta, comprobar la salida y conmutarla:
 ```bash
 ae5ctl cards
 ae5ctl status
+ae5ctl switch speakers --dry-run --json
+ae5ctl toggle --dry-run
 ae5ctl switch headphones
 ae5ctl switch speakers
 ae5ctl toggle
@@ -49,6 +52,13 @@ ae5ctl doctor --json
 ae5ctl doctor --pipewire --json  # Inspección opcional, solo lectura
 ae5ctl profiles diff --json       # Comparación sin escribir en ALSA
 ```
+
+**Previsualización segura:** `switch --dry-run` y `toggle --dry-run` leen el
+selector actual, muestran el `numid` y la opción enumerada que usarían y
+construyen el comando `amixer cset` previsto, **sin ejecutarlo**. No garantizan
+que, entre la previsualización y un cambio posterior, la tarjeta o sus
+controles sigan siendo iguales. El cambio efectivo vuelve a comprobar la
+identidad de la tarjeta y verifica el selector tras escribir.
 
 **Advertencia:** `switch` y `toggle` escriben únicamente el control enumerado
 de la tarjeta ALSA seleccionada. No restauran los perfiles
