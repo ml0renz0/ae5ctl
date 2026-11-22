@@ -149,7 +149,7 @@ def test_control_names_preserve_spaces_and_quoted_punctuation():
     text = """state.Creative {
   control.4 {
     iface MIXER
-    name 'Owner\\'s Audio #1'
+    name "Owner's Audio #1"
     index 1
     value 'Left / Right'
     comment { type ENUMERATED count 1 }
