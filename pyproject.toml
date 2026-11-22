@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ae5ctl"
 version = "0.1.0.dev0"
-description = "Read-only ALSA diagnostics for Sound BlasterX AE-5 on Linux"
+description = "ALSA output switching and diagnostics for Sound BlasterX AE-5 on Linux"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
