@@ -404,7 +404,9 @@ def test_json_error_does_not_include_human_hint(backend, capsys):
         (["toggle"], "toggle", ()),
     ],
 )
-def test_output_actions_expose_readback_json(backend, capsys, argv, method, expected_args):
+def test_output_actions_expose_readback_json(
+    backend, capsys, argv, method, expected_args
+):
     instance, _ = backend
     assert cli.main([*argv, "--card", "Creative", "--numid", "37", "--json"]) == 0
 

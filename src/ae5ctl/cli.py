@@ -46,8 +46,12 @@ ERROR_HINTS = {
         "Guarde 'ae5ctl doctor --json' para reportar un formato ALSA no reconocido."
     ),
     "unreadable_cards": "Compruebe los permisos de /proc/asound/cards.",
-    "ambiguous_output": "Examine las opciones con amixer y especifique el selector correcto.",
-    "verify_failed": "El resultado es incierto: ejecute ae5ctl status antes de reintentar.",
+    "ambiguous_output": (
+        "Examine las opciones con amixer y especifique el selector correcto."
+    ),
+    "verify_failed": (
+        "El resultado es incierto: ejecute ae5ctl status antes de reintentar."
+    ),
 }
 
 
