@@ -8,7 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from ae5ctl import __version__
-from ae5ctl.alsa import AlsaBackend, AlsaError, Status, SwitchResult
+from ae5ctl.alsa import AlsaBackend, AlsaError, Status, SwitchPlan, SwitchResult
 from ae5ctl.audio_session import inspect_audio_session
 from ae5ctl.profiles import (
     HEADPHONES_FILE,
@@ -25,6 +25,7 @@ SELECTION_ERRORS = {
     "ambiguous_control",
     "unknown_output",
     "ambiguous_output",
+    "card_changed",
 }
 DIAGNOSTIC_NOTES = [
     "El comando doctor es de solo lectura; no modifica controles ni perfiles.",
@@ -60,6 +61,7 @@ ERROR_HINTS = {
     "verify_failed": (
         "El resultado es incierto: ejecute ae5ctl status antes de reintentar."
     ),
+    "card_changed": "La tarjeta cambió. Compruebe ae5ctl cards y consulte de nuevo.",
 }
 
 
@@ -101,6 +103,7 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl switch headphones    Selecciona auriculares\n"
             "  ae5ctl switch speakers      Selecciona altavoces\n"
             "  ae5ctl toggle               Alterna ambas salidas\n"
+            "  ae5ctl switch speakers --dry-run  Previsualiza sin cambiar audio\n"
             "  ae5ctl tray                  Indicador de bandeja (GTK/Ayatana)\n"
             "  ae5ctl doctor --json        Diagnóstico ALSA estructurado\n"
             "  ae5ctl doctor --pipewire    Inspección del servidor de audio\n"
@@ -153,15 +156,19 @@ def parser() -> argparse.ArgumentParser:
             "Selecciona auriculares o altavoces modificando solo el control ALSA.",
             "EJEMPLOS\n"
             "  ae5ctl switch headphones\n"
-            "  ae5ctl switch speakers --card Creative --json\n\n"
-            "Lee el selector, cambia su índice y comprueba el resultado.\n"
+            "  ae5ctl switch speakers --card Creative --json\n"
+            "  ae5ctl switch speakers --dry-run --json\n\n"
+            "--dry-run muestra el cset previsto SIN ejecutarlo.\n"
+            "Lee el selector, cambia su índice y comprueba el resultado.\n
             "No modifica volumen, DSP ni perfiles PipeWire.",
         ),
         "toggle": (
             "Alterna según el valor real del selector ALSA.",
             "EJEMPLOS\n"
             "  ae5ctl toggle\n"
-            "  ae5ctl toggle --card Creative --json\n\n"
+            "  ae5ctl toggle --card Creative --json\n"
+            "  ae5ctl toggle --dry-run\n\n"
+            "--dry-run calcula la próxima salida sin modificar ALSA.\n"
             "No se basa en un archivo de último estado ni restaura perfiles.",
         ),
         "profiles": (
@@ -256,6 +263,12 @@ def parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="consultar servidor y salidas mediante pactl (solo lectura)",
             )
+        if name in {"switch", "toggle"}:
+            command.add_argument(
+                "--dry-run",
+                action="store_true",
+                help="mostrar el cambio y comando ALSA previstos sin escribir",
+            )
         if name == "switch":
             command.add_argument(
                 "output",
@@ -294,6 +307,42 @@ def switch_dict(result: SwitchResult) -> dict:
         "previous_output": result.before.output,
         "changed": result.changed,
     }
+
+
+def plan_dict(plan: SwitchPlan) -> dict:
+    before = plan.before
+    return {
+        "scope": "alsa",
+        "dry_run": True,
+        "card": asdict(before.card),
+        "control": asdict(before.control),
+        "previous_output": before.output,
+        "output": plan.target,
+        "item_index": plan.item_index,
+        "changed": plan.changed,
+        "planned_command": (
+            [
+                "amixer",
+                "-c",
+                str(before.card.index),
+                "cset",
+                f"numid={before.control.numid}",
+                str(plan.item_index),
+            ]
+            if plan.changed
+            else None
+        ),
+    }
+
+
+def print_plan(value: dict) -> None:
+    print("Previsualización ALSA: no se ha escrito ningún control.")
+    print(f"Salida actual: {value['previous_output']}")
+    print(f"Salida prevista: {value['output']}")
+    if value["changed"]:
+        print("Comando previsto: " + " ".join(value["planned_command"]))
+    else:
+        print("La salida ya está seleccionada: no sería necesaria una escritura.")
 
 
 def print_switch(value: dict) -> None:
@@ -462,15 +511,30 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print_status(status)
         else:
-            if args.command == "switch":
-                changed = backend.switch(args.output, card=args.card, numid=args.numid)
+            if args.dry_run:
+                if args.command == "switch":
+                    plan = backend.plan_switch(
+                        args.output, card=args.card, numid=args.numid
+                    )
+                else:
+                    plan = backend.plan_toggle(card=args.card, numid=args.numid)
+                preview = plan_dict(plan)
+                if args.json:
+                    print_json(preview)
+                else:
+                    print_plan(preview)
             else:
-                changed = backend.toggle(card=args.card, numid=args.numid)
-            outcome = switch_dict(changed)
-            if args.json:
-                print_json(outcome)
-            else:
-                print_switch(outcome)
+                if args.command == "switch":
+                    changed = backend.switch(
+                        args.output, card=args.card, numid=args.numid
+                    )
+                else:
+                    changed = backend.toggle(card=args.card, numid=args.numid)
+                outcome = switch_dict(changed)
+                if args.json:
+                    print_json(outcome)
+                else:
+                    print_switch(outcome)
     except AlsaError as error:
         if args.json:
             print_json({"error": error_dict(error)})
