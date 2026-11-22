@@ -13,7 +13,7 @@ MAX_DEPTH = 12
 _ROUTING = re.compile(r"output|route|selector|mux|port|channel|jack", re.I)
 _LEVEL = re.compile(r"volume|gain|boost|attenuat|level|mute|playback switch", re.I)
 _DSP = re.compile(
-    r"crystal|surround|equaliz|eq\\b|bass|treble|scout|dialog|effect|dsp",
+    r"crystal|surround|equaliz|eq\b|bass|treble|scout|dialog|effect|dsp",
     re.I,
 )
 
