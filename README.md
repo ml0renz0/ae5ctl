@@ -48,8 +48,9 @@ ae5ctl toggle --dry-run
 ae5ctl switch headphones
 ae5ctl switch speakers
 ae5ctl toggle
-ae5ctl validate                      # No escribe; diagnóstico previo
-ae5ctl validate --apply              # Prueba auditiva guiada y reversible
+ae5ctl validate                      # Diagnóstico previo de solo lectura
+ae5ctl wizard                        # Wizard: tonos, preguntas y restauración
+ae5ctl validate --apply              # Alias de ae5ctl wizard
 ae5ctl doctor --json
 ae5ctl doctor --pipewire --json  # Inspección opcional, solo lectura
 ae5ctl doctor --profiles --json  # Diagnóstico + perfiles originales
@@ -132,26 +133,33 @@ que se haya probado el hardware. Si falta un fichero, se muestra el error
 Sin `--profiles`, el JSON anterior no cambia. El informe puede incluir
 identificadores de dispositivos: revísalo antes de publicarlo.
 
-## Validación física guiada (opcional)
+## Wizard de validación auditiva
 
-La guía [Validación en Ubuntu](docs/validation-ubuntu.md) separa comprobaciones
-ALSA, escucha real y revisión visual del indicador GNOME. Antes de ejecutar
-cambios, revisa `ae5ctl doctor --profiles --pipewire --json` y confirma que
-las diferencias con el script original no requieren restaurar volumen o DSP.
+`ae5ctl wizard` es el flujo recomendado para probar el selector físico,
+sin seguir manualmente una serie de comandos. Usa `pactl` para localizar una
+salida de audio asociada a la tarjeta ALSA y `paplay` (compatible con
+PipeWire mediante `pipewire-pulse`) para generar tres tonos cortos a bajo
+nivel digital; **no cambia el sink predeterminado**. Necesita el paquete
+`pulseaudio-utils`.
 
 ```bash
-ae5ctl validate --card ID_ALSA            # Solo lectura, sin prompts
-ae5ctl validate --apply --card ID_ALSA    # Interactiva, solicita CAMBIAR
+sudo apt install pulseaudio-utils
+ae5ctl wizard
+# o indicar la tarjeta ALSA si no se detecta automáticamente
+ae5ctl wizard --card ID_ALSA
 ```
 
-`--apply` nunca reproduce audio automáticamente: debes poner una muestra
-de audio tú mismo, confirmar si se oye en ambas salidas y revisar el retorno
-a la selección inicial. Solo cambia el selector ALSA; intenta restaurarlo
-también si interrumpes la prueba, pero **no garantiza recuperación** ante
-desconexión de la tarjeta, fallo de permisos o cambio de controles.
-Un resultado correcto valida únicamente el recorrido de la CLI y la
-confirmación auditiva manual, no DSP, PipeWire ni la bandeja. Los códigos
-`5` y `130` indican validación incompleta e interrupción, respectivamente.
+El asistente identifica la AE-5, revisa diferencias de perfiles si están
+disponibles, elige una salida de reproducción verificable o te deja escoger,
+reproduce un tono por la salida actual y pregunta si lo oyes. Solo tras teclear
+`CAMBIAR` conmuta el control ALSA, reproduce otro tono y pregunta de nuevo.
+Al terminar intenta restaurar la selección original, emite un tercer tono y
+solicita la última confirmación. Si hay errores o cancelación, explica si ha
+podido restaurar ALSA. No asegura equivalencia DSP ni sustituye las pruebas
+visuales de GNOME.
+
+`ae5ctl validate` sigue siendo de solo lectura y `validate --apply` es
+un alias del wizard. Guía completa: [validación en Ubuntu](docs/validation-ubuntu.md).
 
 ## Indicador de bandeja (opcional)
 

@@ -23,6 +23,8 @@ def run_validation(
     apply: bool = False,
     ask: Callable[[str], str] = input,
     say: Callable[[str], None] = print,
+    sample: Callable[[str], bool] | None = None,
+    on_step: Callable[[int, str], None] | None = None,
 ) -> int:
     """Inspect, optionally toggle with explicit consent, then attempt recovery.
 
@@ -52,43 +54,58 @@ def run_validation(
         say("Use --apply para iniciar una prueba auditiva con autorización manual.")
         return 0
 
-    say("Pon una muestra de sonido en reproducción desde Ubuntu.")
-    say("El programa NO genera sonido ni guarda perfiles ALSA.")
+    if sample is None:
+        say("Pon una muestra de sonido en reproducción desde Ubuntu.")
+        say("El programa NO genera sonido ni guarda perfiles ALSA.")
+    else:
+        say("El wizard emitirá tres tonos cortos por la salida elegida.")
+        say("Ajusta el volumen a un nivel moderado antes de continuar.")
     attempted = False
     alternate_audible = False
     interrupted = False
     failure: str | None = None
     restored = False
     try:
-        if not _heard(ask, "¿Se oye la salida inicial? [s/N] "):
+        if on_step is not None:
+            on_step(3, "Comprobación auditiva de la salida inicial")
+        if sample is not None and not sample(initial.output):
+            failure = "No se pudo reproducir el tono en la salida inicial."
+        elif not _heard(ask, "¿Se oye el audio por la salida inicial? [s/N] "):
             failure = "No se confirmó audio en la salida inicial."
-        elif (
-            ask(f"Escribe CAMBIAR para pasar a {plan.target} [cancelar]: ").strip()
-            != "CAMBIAR"
-        ):
-            failure = "La escritura ALSA no ha sido autorizada."
         else:
-            attempted = True
-            try:
-                switched = backend.switch(
-                    plan.target, card=pinned_card, numid=pinned_numid
-                )
-                if not switched.changed:
-                    # No write was made: do not undo another client's selection.
-                    attempted = False
-                    failure = "La salida ya había cambiado; prueba no concluyente."
-                else:
-                    alternate_audible = _heard(
-                        ask, f"¿Se oye audio por {plan.target}? [s/N] "
+            if on_step is not None:
+                on_step(4, "Autorización del cambio ALSA")
+            if (
+                ask(f"Escribe CAMBIAR para pasar a {plan.target} [cancelar]: ").strip()
+                != "CAMBIAR"
+            ):
+                failure = "La escritura ALSA no ha sido autorizada."
+            else:
+                attempted = True
+                try:
+                    switched = backend.switch(
+                        plan.target, card=pinned_card, numid=pinned_numid
                     )
-                    if not alternate_audible:
-                        failure = "No se confirmó audio en la salida alternativa."
-            except AlsaError as error:
-                if error.code in NO_WRITE_ERRORS:
-                    # The engine explicitly refused cset. Do not override
-                    # an external change by attempting to restore our snapshot.
-                    attempted = False
-                failure = f"Conmutación ALSA fallida [{error.code}]: {error}"
+                    if not switched.changed:
+                        # No write was made: do not undo another client's selection.
+                        attempted = False
+                        failure = "La salida ya había cambiado; prueba no concluyente."
+                    else:
+                        if on_step is not None:
+                            on_step(5, "Comprobación auditiva de la salida alternativa")
+                        if sample is not None and not sample(plan.target):
+                            failure = "No se pudo reproducir el tono alternativo."
+                        else:
+                            alternate_audible = _heard(
+                                ask, f"¿Se oye audio por {plan.target}? [s/N] "
+                            )
+                            if not alternate_audible:
+                                failure = "No se confirmó audio en la salida alternativa."
+                except AlsaError as error:
+                    if error.code in NO_WRITE_ERRORS:
+                        # No cset: do not undo an external selection.
+                        attempted = False
+                    failure = f"Conmutación ALSA fallida [{error.code}]: {error}"
     except (KeyboardInterrupt, EOFError):
         interrupted = True
         failure = "La validación se interrumpió."
@@ -102,6 +119,9 @@ def run_validation(
                 restored = result.after.output == initial.output
             except AlsaError as error:
                 failure = f"Restauración ALSA fallida [{error.code}]: {error}"
+            except (KeyboardInterrupt, EOFError):
+                interrupted = True
+                failure = "Interrumpida durante la restauración: estado incierto."
             if restored:
                 say("ALSA confirma de nuevo la selección inicial.")
             else:
@@ -119,6 +139,11 @@ def run_validation(
         say("Validación incompleta: no se han verificado ambas salidas.")
         return 5
     try:
+        if on_step is not None:
+            on_step(6, "Comprobación final después de restaurar ALSA")
+        if sample is not None and not sample(initial.output):
+            say("Validación incompleta: no se pudo reproducir el tono final.")
+            return 5
         if not _heard(ask, "¿Vuelve a oírse la salida inicial? [s/N] "):
             say("Validación incompleta: no se confirmó audio tras restaurar.")
             return 5

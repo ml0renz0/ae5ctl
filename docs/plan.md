@@ -260,3 +260,16 @@ Una restauración fallida se informa explícitamente; no se aplican perfiles,
 volúmenes ni reparación automática. La comprobación del indicador GTK/Ayatana
 se documenta por separado en `docs/validation-ubuntu.md`. Los tests simulan
 hardware y respuestas del operador; no constituyen validación física.
+
+## Wizard auditivo con generación de señal de prueba (PR #4)
+
+`ae5ctl wizard` agrupa seis pasos visibles en la terminal: estado ALSA,
+comparación orientativa de los perfiles existentes, elección de una salida
+PipeWire/PulseAudio asociada por `alsa.card` (selección manual si falta la
+asociación), tono de prueba inicial, consentimiento `CAMBIAR`, tono tras
+conmutación y tercer tono después de restaurar. Utiliza `pactl -f json list
+sinks` para leer la sesión y `paplay --device` para reproducir un WAV
+temporal de amplitud digital baja. Nunca cambia la salida predeterminada del
+servidor, ajusta volúmenes ni restaura perfiles. `validate --apply` comparte
+este flujo; `validate` sin flag sigue siendo de solo lectura. Los tests
+simulan ALSA, PipeWire y ejecución de audio; falta validación física y GUI.

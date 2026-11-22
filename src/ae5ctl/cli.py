@@ -108,7 +108,8 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl switch speakers      Selecciona altavoces\n"
             "  ae5ctl toggle               Alterna ambas salidas\n"
             "  ae5ctl validate             Inspección guiada sin modificar ALSA\n"
-            "  ae5ctl validate --apply     Prueba física interactiva con restauración\n"
+            "  ae5ctl wizard               Wizard auditivo de seis pasos\n"
+            "  ae5ctl validate --apply     Alias del wizard auditivo\n"
             "  ae5ctl switch speakers --dry-run  Previsualiza sin cambiar audio\n"
             "  ae5ctl tray                  Indicador de bandeja (GTK/Ayatana)\n"
             "  ae5ctl doctor --json        Diagnóstico ALSA estructurado\n"
@@ -181,6 +182,15 @@ def parser() -> argparse.ArgumentParser:
             "--dry-run calcula la próxima salida sin modificar ALSA.\n"
             "No se basa en un archivo de último estado ni restaura perfiles.",
         ),
+        "wizard": (
+            "Comprueba ambas salidas con tonos y confirmaciones paso a paso.",
+            "EJEMPLOS\n"
+            "  ae5ctl wizard\n"
+            "  ae5ctl wizard --card Creative\n\n"
+            "Detecta la salida PipeWire/PulseAudio correspondiente a la tarjeta.\n"
+            "Emite tonos mediante paplay y pregunta si se oyen.\n"
+            "Solo escribe en ALSA tras autorización CAMBIAR; restaura el selector.",
+        ),
         "validate": (
             "Inspecciona el selector y guía una prueba auditiva opcional.",
             "EJEMPLOS\n"
@@ -188,8 +198,8 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl validate --card Creative\n"
             "  ae5ctl validate --apply --card Creative\n\n"
             "Sin --apply: solo lectura; no reproduce sonido.\n"
-            "Con --apply: requiere interacción y autorización 'CAMBIAR';\n"
-            "cambia solo el selector ALSA e intenta restaurarlo al terminar.\n"
+            "Con --apply: inicia el mismo wizard que 'ae5ctl wizard'.\n"
+            "Solicita autorización 'CAMBIAR' antes de tocar ALSA.\n"
             "No certifica DSP, volumen, PipeWire ni la bandeja GNOME.",
         ),
         "profiles": (
@@ -217,7 +227,8 @@ def parser() -> argparse.ArgumentParser:
         ("doctor", "diagnosticar la lectura ALSA (sin reparar audio)"),
         ("switch", "seleccionar auriculares o altavoces"),
         ("toggle", "alternar la salida ALSA"),
-        ("validate", "guiar una prueba física segura de las salidas"),
+        ("validate", "consultar o validar la salida AE-5"),
+        ("wizard", "probar ambas salidas mediante asistente guiado"),
         ("tray", "mostrar el indicador gráfico opcional"),
         ("profiles", "comparar perfiles ALSA guardados (solo lectura)"),
     ]:
@@ -267,7 +278,7 @@ def parser() -> argparse.ArgumentParser:
                 "--json", action="store_true", help="imprimir JSON para scripts"
             )
             continue
-        if name not in {"tray", "validate"}:
+        if name not in {"tray", "validate", "wizard"}:
             command.add_argument(
                 "--json", action="store_true", help="imprimir JSON para scripts"
             )
@@ -545,12 +556,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "doctor":
         return doctor(backend, args)
     try:
+        if args.command == "wizard" or (
+            args.command == "validate" and args.apply
+        ):
+            from ae5ctl.wizard import run_wizard
+
+            return run_wizard(backend, card=args.card, numid=args.numid)
         if args.command == "validate":
             from ae5ctl.validation import run_validation
 
-            return run_validation(
-                backend, card=args.card, numid=args.numid, apply=args.apply
-            )
+            return run_validation(backend, card=args.card, numid=args.numid)
         if args.command == "cards":
             cards = [asdict(card) for card in backend.cards()]
             if args.json:

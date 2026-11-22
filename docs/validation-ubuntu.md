@@ -28,35 +28,43 @@ conmutación sustituye a la restauración de perfiles**. Los archivos
 `~/.config/ae5-{headphones,speakers}.state` se leen, nunca se restauran
 automáticamente. Si faltan, el informe marca el error de forma opcional.
 
-## 2. Prueba auditiva de la CLI
+## 2. Wizard auditivo automático y guiado
 
-Con una muestra de música o de audio reproduciéndose **por tu cuenta** desde
-Ubuntu y un volumen moderado, ejecuta:
+Se recomienda ejecutar **una sola orden** con el audio físico conectado:
 
 ```bash
-.venv/bin/ae5ctl validate --apply --card ID_ALSA
+sudo apt install pulseaudio-utils
+.venv/bin/ae5ctl wizard
+# Si es necesario especificar la tarjeta:
+.venv/bin/ae5ctl wizard --card ID_ALSA
 ```
 
-El asistente identifica el selector, pregunta si oyes la salida actual y
-requiere teclear **CAMBIAR** antes de escribir. Tras alternar el control,
-pregunta si se oye la salida de destino. A continuación intenta restaurar
-la selección ALSA original **aunque la otra salida no se oiga o pulses
-Ctrl+C**. Por último pregunta si vuelve a escucharse la salida inicial.
+El programa realiza seis pasos, mostrando cada uno en pantalla: identifica
+tarjeta, selector y perfiles; descubre qué salida PipeWire/PulseAudio pertenece
+a la AE-5 (si no puede asociarla, pide que elijas); reproduce un tono breve
+mediante `paplay --device` por la salida seleccionada; pregunta si se oye;
+solicita autorización explícita `CAMBIAR` antes de modificar el selector ALSA;
+reproduce otro tono y vuelve a preguntar. Finalmente intenta restaurar la
+salida inicial y reproduce un tercer tono para pedir confirmación final.
 
-- Sin `--apply`: solo lecturas, ninguna pregunta ni escritura.
-- Sin respuesta afirmativa o sin autorización `CAMBIAR`: ninguna escritura.
-- Si otro programa cambia el selector durante la preparación, el motor rechaza
-  la escritura obsoleta. Evita acciones simultáneas en la bandeja.
-- Si la tarjeta se desconecta o cambia de identidad, la restauración puede
-  fallar: se indica expresamente y debes revisar `ae5ctl status`.
-- La recuperación automática se refiere **solo al selector ALSA**, nunca a
-  perfiles completos, volúmenes, DSP ni rutas de PipeWire.
-- Código 0: respuestas auditivas afirmativas y valor ALSA inicial confirmado.
-  Código 5: prueba incompleta/no satisfactoria. 130: interrumpida.
+Puedes responder `s` o `n` en cada prueba; no tienes que abrir otro
+reproductor, pegar comandos ni preparar un archivo WAV. El wizard genera un
+tono a nivel digital moderado y borra su fichero temporal al terminar; **baja
+antes el volumen de auriculares/altavoces**. No cambia el sink predeterminado
+de PipeWire, volúmenes del sistema, DSP o perfiles ALSA. Requiere que el
+servidor de sonido de la sesión esté funcionando. Si `pactl` no expone la
+asociación ALSA, la selección del sink es explícita y el wizard advierte que
+no puede verificar esa asociación automáticamente.
 
-No se envía sonido de prueba desde la herramienta. Escuchar es la única manera
-de confirmar en esta fase qué conector está funcionando. El resultado por sí
-solo **no valida la equivalencia con el script antiguo**.
+Cancelar antes de confirmar `CAMBIAR` no escribe en ALSA. Una vez enviada la
+conmutación, el programa intenta recuperar el selector original incluso ante
+errores o Ctrl+C. Fallos de hardware, hotplug o cambios ajenos pueden impedir
+la restauración; el asistente informa de ese estado incierto. El código 0
+requiere tres respuestas auditivas afirmativas y confirmación del selector
+original; 5 indica prueba incompleta y 130, interrupción.
+
+`ae5ctl validate` conserva el modo de solo lectura; `validate --apply`
+ejecuta este mismo wizard.
 
 ## 3. Indicador GTK/Ayatana en GNOME
 

@@ -569,12 +569,12 @@ def test_tray_invalid_args_fail_before_loading_gui(backend, capsys, args):
 
 
 def test_validate_cli_delegates_flags_without_gui_or_alsa_writes(backend, monkeypatch):
-    from ae5ctl import validation
+    from ae5ctl import wizard
 
     requested = Mock(return_value=0)
-    monkeypatch.setattr(validation, "run_validation", requested)
+    monkeypatch.setattr(wizard, "run_wizard", requested)
     assert cli.main(["validate", "--apply", "--card", "Creative", "--numid", "43"]) == 0
-    requested.assert_called_once_with(backend[0], card="Creative", numid=43, apply=True)
+    requested.assert_called_once_with(backend[0], card="Creative", numid=43)
 
 
 def test_validate_help_does_not_access_hardware(backend, capsys):
@@ -592,3 +592,29 @@ def test_validate_rejects_json_before_accessing_hardware(backend, capsys):
         cli.main(["validate", "--json"])
     assert result.value.code == 2
     assert "--json" in capsys.readouterr().err
+
+
+def test_wizard_delegates_to_shared_guided_flow(backend, monkeypatch):
+    from ae5ctl import wizard
+
+    requested = Mock(return_value=0)
+    monkeypatch.setattr(wizard, "run_wizard", requested)
+    assert cli.main(["wizard", "--card", "Creative", "--numid", "43"]) == 0
+    requested.assert_called_once_with(backend[0], card="Creative", numid=43)
+
+
+def test_validate_without_apply_remains_read_only(backend, monkeypatch):
+    from ae5ctl import validation
+
+    requested = Mock(return_value=0)
+    monkeypatch.setattr(validation, "run_validation", requested)
+    assert cli.main(["validate", "--card", "Creative"]) == 0
+    requested.assert_called_once_with(backend[0], card="Creative", numid=None)
+
+
+@pytest.mark.parametrize("args", [["wizard", "--json"], ["wizard", "--apply"]])
+def test_wizard_rejects_incompatible_flags_before_audio(backend, capsys, args):
+    with pytest.raises(SystemExit) as error:
+        cli.main(args)
+    assert error.value.code == 2
+    assert capsys.readouterr().err
