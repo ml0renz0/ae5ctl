@@ -46,6 +46,14 @@ class SwitchResult:
     changed: bool
 
 
+@dataclass(frozen=True)
+class SwitchPlan:
+    before: Status
+    target: str
+    item_index: int
+    changed: bool
+
+
 _CARD = re.compile(r"^\s*(\d+)\s+\[([^\]]+)\]\s*:\s*(.+)$")
 _CARD_START = re.compile(r"^\s*\d+\s+\[")
 _AE5 = re.compile(r"(?<![a-z0-9])ae[- ]?5(?![a-z0-9])", re.IGNORECASE)
@@ -304,27 +312,75 @@ class AlsaBackend:
             )
         return Status(selected, control, output)
 
-    def _change(self, before: Status, target: str) -> SwitchResult:
-        """Write only the chosen ALSA enum, then verify the same control."""
+    @staticmethod
+    def _plan(before: Status, target: str) -> SwitchPlan:
+        """Compute the ALSA enum item without modifying hardware."""
+        if target not in {"headphones", "speakers"}:
+            raise ValueError("La salida debe ser headphones o speakers.")
         if before.output == target:
-            return SwitchResult(before=before, after=before, changed=False)
-        indices = [
+            return SwitchPlan(
+                before=before,
+                target=target,
+                item_index=before.control.values[0],
+                changed=False,
+            )
+        matches = [
             index
             for index, label in before.control.items.items()
             if _output(label) == target
         ]
-        if len(indices) != 1:
+        if len(matches) != 1:
             raise AlsaError(
                 "ambiguous_output",
                 "La salida solicitada no tiene una opción ALSA única.",
+            )
+        return SwitchPlan(
+            before=before, target=target, item_index=matches[0], changed=True
+        )
+
+    def plan_switch(
+        self, output: str, card: str | None = None, numid: int | None = None
+    ) -> SwitchPlan:
+        """Inspect exactly the enum change switch would perform, without cset."""
+        if output not in {"headphones", "speakers"}:
+            raise ValueError("La salida debe ser headphones o speakers.")
+        return self._plan(self.status(card=card, numid=numid), output)
+
+    def plan_toggle(
+        self, card: str | None = None, numid: int | None = None
+    ) -> SwitchPlan:
+        """Determine the opposite of the live ALSA selection without writing."""
+        before = self.status(card=card, numid=numid)
+        target = "speakers" if before.output == "headphones" else "headphones"
+        return self._plan(before, target)
+
+    def _change(self, before: Status, target: str) -> SwitchResult:
+        """Write the planned ALSA enum, guarding card identity and readback."""
+        plan = self._plan(before, target)
+        if not plan.changed:
+            return SwitchResult(before=before, after=before, changed=False)
+        # A hotplug or driver reset may reuse the numeric index. Never write
+        # the old control to a different card even if its index is identical.
+        if before.card not in self.cards():
+            raise AlsaError(
+                "card_changed",
+                "La identidad de la tarjeta ALSA cambió antes de escribir. "
+                "Ejecute ae5ctl cards y repita la consulta.",
             )
         self._run(
             before.card,
             "cset",
             f"numid={before.control.numid}",
-            str(indices[0]),
+            str(plan.item_index),
         )
-        control = self._control(before.card, before.control.numid)
+        try:
+            control = self._control(before.card, before.control.numid)
+        except AlsaError as exc:
+            raise AlsaError(
+                "verify_failed",
+                f"El cambio se envió, pero no se pudo verificar: {exc}. "
+                "Consulte ae5ctl status antes de volver a intentarlo.",
+            ) from exc
         if (
             len(control.values) != 1
             or _output(control.items.get(control.values[0], "")) != target
