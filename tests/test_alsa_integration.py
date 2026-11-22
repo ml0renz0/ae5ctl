@@ -74,7 +74,9 @@ def simulated_ae5(monkeypatch, tmp_path):
     monkeypatch.setattr(
         cli,
         "AlsaBackend",
-        lambda timeout: AlsaBackend(cards_path=cards_file, runner=runner, timeout=timeout),
+        lambda timeout: AlsaBackend(
+            cards_path=cards_file, runner=runner, timeout=timeout
+        ),
     )
     return state, runner
 
@@ -87,9 +89,7 @@ def test_switch_dry_run_emits_exact_command_and_never_writes(simulated_ae5, caps
     assert data["previous_output"] == "headphones"
     assert data["output"] == "speakers"
     assert data["item_index"] == 1
-    assert data["planned_command"] == [
-        "amixer", "-c", "7", "cset", "numid=43", "1"
-    ]
+    assert data["planned_command"] == ["amixer", "-c", "7", "cset", "numid=43", "1"]
     assert state["item"] == 0
     assert state["writes"] == 0
     assert all("cset" not in call.args[0] for call in runner.call_args_list)
