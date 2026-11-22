@@ -7,8 +7,9 @@ Sound BlasterX AE-5 en Linux, desde una CLI y una bandeja gráfica opcional.
 
 La CLI `ae5ctl` consulta las tarjetas, el control de salida y la selección ALSA
 sin depender de GTK. Interpreta los índices enumerados y admite `Headphone` y
-`Headphones`. Todavía no cambia salidas, restaura perfiles ni repara el audio
-después de suspender. La lectura en una AE-5 física sigue pendiente de contraste.
+`Headphones`. Los comandos `switch` y `toggle` cambian **solo el selector ALSA**
+y comprueban el resultado; no restauran perfiles de volumen o DSP. La validación
+en una AE-5 física sigue pendiente de contraste.
 
 El punto de partida es [`ae5-switcher.py`](ae5-switcher.py), conservado sin cambios
 como referencia. Utiliza GTK 3, AppIndicator3 y dos perfiles ALSA para alternar
@@ -29,17 +30,28 @@ ae5ctl --help             # Comandos, ejemplos, límites y códigos de salida
 ae5ctl --version          # Versión instalada
 ae5ctl cards --help       # Ayuda para listar dispositivos
 ae5ctl status --help      # Opciones --card, --numid y --timeout
+ae5ctl switch --help      # Seleccionar una salida con verificación
+ae5ctl toggle --help      # Alternar la salida física ALSA
 ae5ctl doctor --help      # Diagnóstico y limitaciones
 ```
 
-La versión actual **solo consulta** ALSA. Para descubrir la tarjeta y leer el estado
-del selector:
+Para descubrir la tarjeta, comprobar la salida y conmutarla:
 
 ```bash
 ae5ctl cards
 ae5ctl status
+ae5ctl switch headphones
+ae5ctl switch speakers
+ae5ctl toggle
 ae5ctl doctor --json
 ```
+
+**Advertencia:** `switch` y `toggle` escriben únicamente el control enumerado
+de la tarjeta ALSA seleccionada. No restauran los perfiles
+`~/.config/ae5-{headphones,speakers}.state`, ni ajustan ganancia, DSP, volumen,
+perfiles de PipeWire o rutas de aplicaciones. Si el sonido dependía de esos
+ajustes, compare los perfiles originales antes de sustituir la aplicación GTK.
+No se han probado todavía los cambios físicos en el equipo real.
 
 Si `status` no identifica la tarjeta de forma inequívoca, use el ID mostrado en
 `cards` con `--card`; indique `--numid` únicamente si hay varios selectores
@@ -49,7 +61,7 @@ de resolución; las respuestas JSON conservan su estructura para automatizacione
 
 ## Instalación y consultas
 
-Se necesita Linux y Python 3.10 o posterior. `status` y `doctor` utilizan `amixer`,
+Se necesita Linux y Python 3.10 o posterior. `status`, `doctor`, `switch` y `toggle` utilizan `amixer`,
 incluido en el paquete `alsa-utils` de Ubuntu. El paquete Python usa únicamente la
 biblioteca estándar; no necesita PyGObject ni escritorio. Desde la raíz del
 repositorio:
@@ -78,8 +90,8 @@ Por ejemplo, tras sustituir los valores por los de tu equipo:
 .venv/bin/ae5ctl status --card ID_ALSA --numid 37 --timeout 5 --json
 ```
 
-`--timeout` limita cada consulta `amixer`, en segundos. `cards`, `status` y
-`doctor` admiten `--json`. Los errores de lectura en JSON se escriben en la salida
+`--timeout` limita cada operación `amixer`, en segundos. Todos los subcomandos
+admiten `--json`. Los resultados y errores en JSON se escriben en la salida
 estándar; en modo texto, los errores se escriben en la salida de errores.
 `doctor` conserva las tarjetas ya leídas y explica los fallos de diagnóstico.
 
@@ -90,10 +102,11 @@ estándar; en modo texto, los errores se escriben en la salida de errores.
 | 3 | Tarjeta o control ausente o ambiguo, o salida desconocida. |
 | 4 | Dependencia ausente, comando fallido, permiso, tiempo límite o respuesta inválida. |
 
-Estas consultas no modifican controles ALSA ni perfiles de Ubuntu. Una selección
-ALSA legible no demuestra que salga audio por el conector esperado. `doctor`
-todavía no inspecciona perfiles de PipeWire/PulseAudio ni determina la causa del
-fallo de suspensión.
+`cards`, `status` y `doctor` son de solo lectura; `switch` y `toggle` sí modifican
+el selector de salida ALSA y verifican que queda seleccionado. Una selección
+ALSA correcta no demuestra que salga audio por el conector esperado. `doctor`
+todavía no inspecciona perfiles de PipeWire ni WirePlumber; la incidencia previa
+a la actualización de Ubuntu no se ha vuelto a observar.
 
 ## Desarrollo
 
