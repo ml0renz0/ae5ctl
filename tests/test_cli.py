@@ -434,9 +434,9 @@ def test_no_arguments_displays_main_help_without_alsa(backend, capsys):
         ),
         (
             ["switch", "--help"],
-            ("--card", "--numid", "headphones", "speakers", "EJEMPLOS"),
+            ("--card", "--numid", "--dry-run", "headphones", "speakers", "EJEMPLOS"),
         ),
-        (["toggle", "--help"], ("--card", "--numid", "EJEMPLOS")),
+        (["toggle", "--help"], ("--card", "--numid", "--dry-run", "EJEMPLOS")),
         (["tray", "--help"], ("--card", "--interval", "Ayatana", "EJEMPLOS")),
     ],
 )
