@@ -12,12 +12,15 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 BUILDER = ROOT / "packaging" / "build_deb.py"
 
-pytestmark = pytest.mark.skipif(
+pytestmark = [
+    pytest.mark.package,
+    pytest.mark.skipif(
     sys.version_info < (3, 11)
-    or shutil.which("dpkg") is None
-    or shutil.which("dpkg-deb") is None,
-    reason="CI package version checks require build Python >= 3.11 and dpkg",
-)
+        or shutil.which("dpkg") is None
+        or shutil.which("dpkg-deb") is None,
+        reason="CI package version checks require build Python >= 3.11 and dpkg",
+    ),
+]
 
 
 @pytest.fixture

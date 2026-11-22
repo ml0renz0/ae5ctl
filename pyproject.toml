@@ -18,7 +18,8 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers --strict-config"
+addopts = "-ra --strict-markers --strict-config -m 'not package'"
+markers = ["package: opt-in tests that build or inspect real Debian packages"]
 xfail_strict = true
 
 [tool.ruff]
