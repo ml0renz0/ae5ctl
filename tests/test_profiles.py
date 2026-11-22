@@ -220,17 +220,20 @@ def test_default_profiles_command_does_not_access_alsa(monkeypatch, tmp_path, ca
         subprocess, "run", Mock(side_effect=AssertionError("subprocess invoked"))
     )
 
-    assert cli.main(
-        [
-            "profiles",
-            "diff",
-            "--headphones",
-            str(hp),
-            "--speakers",
-            str(spk),
-            "--json",
-        ]
-    ) == 0
+    assert (
+        cli.main(
+            [
+                "profiles",
+                "diff",
+                "--headphones",
+                str(hp),
+                "--speakers",
+                str(spk),
+                "--json",
+            ]
+        )
+        == 0
+    )
     out = json.loads(capsys.readouterr().out)
     assert out["summary"]["different_controls"] == 1
 

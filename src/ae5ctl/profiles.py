@@ -217,7 +217,9 @@ def compare_profiles(headphones_path: Path, speakers_path: Path) -> dict:
                     "status": (
                         "changed"
                         if head is not None and spk is not None
-                        else "only_headphones" if head is not None else "only_speakers"
+                        else "only_headphones"
+                        if head is not None
+                        else "only_speakers"
                     ),
                     "headphones_numid": head.numid if head else None,
                     "speakers_numid": spk.numid if spk else None,
@@ -226,9 +228,7 @@ def compare_profiles(headphones_path: Path, speakers_path: Path) -> dict:
                 }
             )
 
-    nonrouting = sum(
-        d["category"] != "possible_routing" for d in differences
-    )
+    nonrouting = sum(d["category"] != "possible_routing" for d in differences)
     affected_cards = sorted({d["card"] for d in differences})
     warnings = []
     if len(all_cards) > 1:

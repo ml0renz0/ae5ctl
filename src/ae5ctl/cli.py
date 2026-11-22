@@ -224,8 +224,7 @@ def parser() -> argparse.ArgumentParser:
                 default=HEADPHONES_FILE,
                 metavar="FICHERO",
                 help=(
-                    "perfil auriculares; por defecto: "
-                    "~/.config/ae5-headphones.state"
+                    "perfil auriculares; por defecto: ~/.config/ae5-headphones.state"
                 ),
             )
             compare.add_argument(
@@ -233,10 +232,7 @@ def parser() -> argparse.ArgumentParser:
                 type=Path,
                 default=SPEAKERS_FILE,
                 metavar="FICHERO",
-                help=(
-                    "perfil altavoces; por defecto: "
-                    "~/.config/ae5-speakers.state"
-                ),
+                help=("perfil altavoces; por defecto: ~/.config/ae5-speakers.state"),
             )
             compare.add_argument(
                 "--json", action="store_true", help="imprimir JSON para scripts"
