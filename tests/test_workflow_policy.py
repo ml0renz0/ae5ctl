@@ -22,8 +22,16 @@ def test_workflow_builds_debian_only_when_explicitly_requested():
     assert "if: >-" in deb
     assert "github.event_name == 'pull_request'" in deb
     assert "build-deb" in deb
-    assert "refs/tags/v" in deb
+    assert "refs/tags/v" not in deb
     assert "python -m pytest -m package" in deb
+    assert "Test install and removal on both Ubuntu versions" in deb
+    assert "python -m pytest -m package" in publish
+    assert "Test install and removal on both Ubuntu versions" in publish
+    assert "Validate version tag and its ancestry on main" in publish
+    assert deb.count("packaging/build_deb.py --revision 1") == 1
+    assert publish.count("packaging/build_deb.py --revision 1") == 1
+    assert "needs: [required]" in publish
+    assert "needs: [required, deb]" not in publish
     assert "github.event_name == 'push'" in publish
     assert "refs/tags/v" in publish
     assert "github.ref == 'refs/heads/main'" not in publish

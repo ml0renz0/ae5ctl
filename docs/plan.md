@@ -216,3 +216,12 @@ en el síntoma.
 - Definir la compatibilidad mínima de Ubuntu y la licencia antes de distribuir.
 - Posponer control avanzado DSP, soporte de otras tarjetas y cambios automáticos
   de rutas PipeWire hasta completar el flujo principal.
+
+## Consolidación de CI de releases (PR #4)
+
+Las releases etiquetadas se procesan en un único job de publicación tras el gate
+de Python. Ese mismo runner comprueba que la etiqueta coincide con la versión y
+que el commit pertenece a `main`, ejecuta las pruebas de paquete, construye
+una sola vez, realiza smoke tests Ubuntu 22.04/24.04, firma y publica el `.deb`
+ya probado. La PR con `build-deb` sigue usando su job opcional independiente.
+No hay artefactos intermedios de Actions ni compilaciones en PR sin etiqueta.

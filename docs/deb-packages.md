@@ -148,16 +148,18 @@ El empaquetado tiene únicamente dos activadores explícitos:
   ninguna `build-<run>` adicional.
 
 El check estable `CI required` continúa siendo el requisito de protección de
-`main`. Exige Python/lint siempre y, cuando se haya pedido expresamente
-Debian con una etiqueta, también exige que pasen sus pruebas y ambos smoke tests.
-Sin etiqueta, espera que el job Debian figure como `skipped`.
+`main`. Exige Python/lint siempre y, cuando una PR solicita `build-deb`,
+también exige sus pruebas y ambos smoke tests. Sin esa etiqueta de PR, espera
+que el job Debian figure como `skipped`.
 
 **No se emplea `upload-artifact` ni `download-artifact` para los paquetes.**
-El `.deb` de validación permanece en el runner temporal y se elimina al acabar
-el job. El job exclusivo de release reconstruye la misma versión y revisión
-desde la misma etiqueta, firma el paquete y deja los cuatro archivos
-(`.deb`, `.deb.sha256`, `.deb.sig`, `signing-public.pem`) únicamente en
-GitHub Releases. Esto evita consumir almacenamiento de artefactos de Actions;
+En PR con `build-deb`, el paquete permanece en el runner temporal. En un push
+de etiqueta Git de versión, el job de publicación valida la versión y su
+pertenencia a `main`, ejecuta los tests de empaquetado, **construye una sola
+vez**, prueba instalación y retirada en Ubuntu 22.04/24.04 y firma ese mismo
+`.deb` probado. Deja los cuatro archivos (`.deb`, `.deb.sha256`, `.deb.sig`,
+`signing-public.pem`) únicamente en GitHub Releases. Nunca se transfiere
+un paquete entre runners. Esto evita consumir almacenamiento de artefactos de Actions;
 los logs y la caché de pip mantienen su propia política de retención.
 
 Las pruebas que crean paquetes se marcan `package` y están excluidas incluso
