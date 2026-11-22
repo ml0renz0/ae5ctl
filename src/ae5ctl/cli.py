@@ -1,4 +1,4 @@
-"""Read-only card discovery and ALSA state diagnostics."""
+"""Sound BlasterX AE-5 read, diagnosis and verified output selection."""
 
 import argparse
 import json
@@ -7,7 +7,7 @@ import sys
 from dataclasses import asdict
 
 from ae5ctl import __version__
-from ae5ctl.alsa import AlsaBackend, AlsaError, Status
+from ae5ctl.alsa import AlsaBackend, AlsaError, Status, SwitchResult
 
 SELECTION_ERRORS = {
     "no_card",
@@ -16,9 +16,10 @@ SELECTION_ERRORS = {
     "no_control",
     "ambiguous_control",
     "unknown_output",
+    "ambiguous_output",
 }
 DIAGNOSTIC_NOTES = [
-    "Solo se consulta ALSA; no se cambia ningún control ni perfil de audio.",
+    "El comando doctor es de solo lectura; no modifica controles ni perfiles.",
     "La selección ALSA no demuestra que salga audio por el conector esperado.",
     "No se inspeccionan perfiles ni rutas PipeWire/WirePlumber.",
 ]
@@ -45,6 +46,8 @@ ERROR_HINTS = {
         "Guarde 'ae5ctl doctor --json' para reportar un formato ALSA no reconocido."
     ),
     "unreadable_cards": "Compruebe los permisos de /proc/asound/cards.",
+    "ambiguous_output": "Examine las opciones con amixer y especifique el selector correcto.",
+    "verify_failed": "El resultado es incierto: ejecute ae5ctl status antes de reintentar.",
 }
 
 
@@ -76,14 +79,19 @@ def parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
             "Control y diagnóstico de Sound BlasterX AE-5 en Linux.\n"
-            "Versión actual: consultas ALSA de solo lectura; NO cambia el audio."
+            "switch y toggle modifican solo el selector físico ALSA de la tarjeta."
         ),
         epilog=(
             "EJEMPLOS\n"
             "  ae5ctl cards                Lista tarjetas y sus ID ALSA\n"
             "  ae5ctl status               Consulta la salida seleccionada\n"
             "  ae5ctl status --card Creative --json\n"
+            "  ae5ctl switch headphones    Selecciona auriculares\n"
+            "  ae5ctl switch speakers      Selecciona altavoces\n"
+            "  ae5ctl toggle               Alterna ambas salidas\n"
             "  ae5ctl doctor --json        Diagnóstico estructurado\n\n"
+            "La conmutación NO restaura perfiles de volumen, ganancia ni DSP.\n"
+            "La lectura ALSA no garantiza que el audio sea audible.\n\n"
             "AYUDA DETALLADA\n"
             "  ae5ctl <comando> --help\n\n"
             "CÓDIGOS DE SALIDA\n"
@@ -125,11 +133,28 @@ def parser() -> argparse.ArgumentParser:
             "No modifica perfiles PipeWire, controles ALSA ni servicios.\n"
             "El diagnóstico PipeWire/WirePlumber todavía no está implementado.",
         ),
+        "switch": (
+            "Selecciona auriculares o altavoces modificando solo el control ALSA.",
+            "EJEMPLOS\n"
+            "  ae5ctl switch headphones\n"
+            "  ae5ctl switch speakers --card Creative --json\n\n"
+            "Lee el selector, cambia su índice y comprueba el resultado.\n"
+            "No modifica volumen, DSP ni perfiles PipeWire.",
+        ),
+        "toggle": (
+            "Alterna según el valor real del selector ALSA.",
+            "EJEMPLOS\n"
+            "  ae5ctl toggle\n"
+            "  ae5ctl toggle --card Creative --json\n\n"
+            "No se basa en un archivo de último estado ni restaura perfiles.",
+        ),
     }
     for name, help_text in [
         ("cards", "listar tarjetas ALSA y obtener sus ID"),
         ("status", "consultar la salida física seleccionada"),
         ("doctor", "diagnosticar la lectura ALSA (sin reparar audio)"),
+        ("switch", "seleccionar auriculares o altavoces"),
+        ("toggle", "alternar la salida ALSA"),
     ]:
         description, epilog = details[name]
         command = commands.add_parser(
@@ -142,6 +167,12 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument(
             "--json", action="store_true", help="imprimir JSON para scripts"
         )
+        if name == "switch":
+            command.add_argument(
+                "output",
+                choices=("headphones", "speakers"),
+                help="salida física de destino",
+            )
         if name != "cards":
             command.add_argument(
                 "--card",
@@ -166,6 +197,20 @@ def parser() -> argparse.ArgumentParser:
 
 def status_dict(status: Status) -> dict:
     return {"scope": "alsa", **asdict(status)}
+
+
+def switch_dict(result: SwitchResult) -> dict:
+    return {
+        **status_dict(result.after),
+        "previous_output": result.before.output,
+        "changed": result.changed,
+    }
+
+
+def print_switch(value: dict) -> None:
+    suffix = "cambiada" if value["changed"] else "ya seleccionada (sin cambios)"
+    print(f"Salida ALSA: {value['previous_output']} → {value['output']} ({suffix})")
+    print("Solo se ha modificado el selector ALSA; no se han restaurado perfiles.")
 
 
 def error_dict(error: AlsaError) -> dict[str, str]:
@@ -250,12 +295,24 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"{card['index']} [{card['id']}] {card['name']}")
                 if not cards:
                     print("No hay tarjetas ALSA disponibles.")
-        else:
+        elif args.command == "status":
             status = status_dict(backend.status(card=args.card, numid=args.numid))
             if args.json:
                 print_json(status)
             else:
                 print_status(status)
+        else:
+            if args.command == "switch":
+                changed = backend.switch(
+                    args.output, card=args.card, numid=args.numid
+                )
+            else:
+                changed = backend.toggle(card=args.card, numid=args.numid)
+            outcome = switch_dict(changed)
+            if args.json:
+                print_json(outcome)
+            else:
+                print_switch(outcome)
     except AlsaError as error:
         if args.json:
             print_json({"error": error_dict(error)})
