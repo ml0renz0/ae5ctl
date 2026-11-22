@@ -188,7 +188,6 @@ def test_discovered_selector_is_cached_and_recovered_after_failure(harness):
     assert updates[-1] == ("headphones", None, False)
 
 
-
 @pytest.mark.parametrize(
     "state,error,busy,headphones,speakers,toggle,refresh",
     [
@@ -253,9 +252,7 @@ def test_numeric_card_index_pins_detected_id_across_errors(harness):
     controller.numid = None
     status = Status(
         card=Card(7, "Creative", "Sound BlasterX AE-5"),
-        control=EnumControl(
-            43, "Output Select", {0: "Speakers", 1: "Headphone"}, (1,)
-        ),
+        control=EnumControl(43, "Output Select", {0: "Speakers", 1: "Headphone"}, (1,)),
         output="headphones",
     )
     backend.status.side_effect = [
