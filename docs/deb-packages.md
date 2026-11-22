@@ -121,52 +121,58 @@ detecta cambios, pero por sí solo no autentica al autor. La firma separada de
 OpenSSL no es una firma GPG de Debian ni un repositorio APT firmado; `apt install`
 no comprueba este `.sig` automáticamente.
 
-## CI/CD automático
+## CI/CD: Debian bajo demanda
 
-El desarrollo sigue TBD: ramas de trabajo cortas, PR hacia `main`, validación y
-revisión antes de fusionar. No se integra mediante push directo a `main`.
-El workflow **CI/CD** valida las PR hacia `main` y los candidatos de la merge
-queue. Tras fusionar una PR, el `push` resultante en `main` ejecuta la cadena
-completa de publicación. Si falla una comprobación, no se firma ni se publica.
+Las PR sin etiqueta y los pushes normales a `main` ejecutan Ruff, pytest
+(sin pruebas de empaquetado) y `CI required`. No construyen archivos `.deb`.
+El empaquetado tiene únicamente dos activadores explícitos:
 
-1. Tests con Python 3.10, 3.11, 3.12 y 3.13, lint y formato.
-2. Generación de un único `.deb` y su checksum, sin root ni descargas del builder.
-3. Instalación, ejecución y eliminación de ese paquete en Ubuntu 22.04 y 24.04.
-4. Solo para un `push` a `main`, firma OpenSSL del mismo archivo ya probado.
-5. Publicación automática de una prerelease en GitHub Releases, con `.deb`,
-   `.deb.sha256`, `.deb.sig` y `signing-public.pem`.
+- **Etiqueta de PR `build-deb`:** ejecutar pruebas de empaquetado, generar
+  un `.deb` y comprobar la instalación y retirada en contenedores Ubuntu
+  22.04 y 24.04. Si se quita la etiqueta, los siguientes commits de esa PR
+  ya no generan paquetes. La PR #4 no lleva la etiqueta.
+- **Etiqueta Git de versión `v<version>`:** iniciar una release desde el
+  código ya fusionado en `main`. El nombre debe coincidir exactamente
+  con `[project].version` de `pyproject.toml` y el commit debe pertenecer
+  a `main`. Por ejemplo, para `0.1.0.dev0`:
 
-El check estable `CI required` solo pasa cuando todas las versiones de Python,
-la generación del paquete y ambas pruebas Ubuntu han terminado correctamente.
-Es el check que debe exigirse en la protección de `main`, junto con la
-obligación de integrar por PR. El workflow no cambia las reglas del repositorio;
-esas reglas se configuran en GitHub. La firma y la publicación solo ocurren en
-`main`, nunca durante la validación de una PR o de la merge queue.
+  ```bash
+  git switch main
+  git pull --ff-only
+  git tag -a v0.1.0.dev0 -m "ae5ctl 0.1.0.dev0"
+  git push origin v0.1.0.dev0
+  ```
 
-No hace falta crear etiquetas, ejecutar Actions manualmente ni usar la API de
-GitHub desde tu equipo. Para descargar los paquetes publicados, abre
-[Releases](https://github.com/ml0renz0/ae5ctl/releases).
+  Solo entonces se prueban y generan los paquetes para su firma y publicación
+  en GitHub Releases. Se reutiliza la **misma etiqueta Git**, sin inventar
+  ninguna `build-<run>` adicional.
 
-Los tests y los paquetes de las PR no reciben las claves de firma ni pueden
-publicar releases. Los permisos `contents: write` solo se conceden al job de
-publicación, condicionado a `main`. La release se crea como borrador, se suben
-todos los archivos y se descargan de nuevo para verificar checksum y firma antes
-de publicarla. Un fallo de subida o verificación impide publicar el borrador.
+El check estable `CI required` continúa siendo el requisito de protección de
+`main`. Exige Python/lint siempre y, cuando se haya pedido expresamente
+Debian con una etiqueta, también exige que pasen sus pruebas y ambos smoke tests.
+Sin etiqueta, espera que el job Debian figure como `skipped`.
 
-### Versiones y reejecuciones
+**No se emplea `upload-artifact` ni `download-artifact` para los paquetes.**
+El `.deb` de validación permanece en el runner temporal y se elimina al acabar
+el job. El job exclusivo de release reconstruye la misma versión y revisión
+desde la misma etiqueta, firma el paquete y deja los cuatro archivos
+(`.deb`, `.deb.sha256`, `.deb.sig`, `signing-public.pem`) únicamente en
+GitHub Releases. Esto evita consumir almacenamiento de artefactos de Actions;
+los logs y la caché de pip mantienen su propia política de retención.
 
-La versión Python sigue en `pyproject.toml`. CI/CD añade una revisión Debian
-`1+ci.<número-de-ejecución>.<intento>`, por ejemplo
-`0.1.0~dev0-1+ci.12.1`. Así, dos builds del mismo upstream no tienen la misma
-versión y APT puede ordenarlos correctamente. La release usa una etiqueta
-automática `build-<id-de-ejecución>-<intento>`, vinculada al SHA exacto que pasó
-las comprobaciones. No se modifica `pyproject.toml` ni se crea un commit de
-versión en el proceso.
+Las pruebas que crean paquetes se marcan `package` y están excluidas incluso
+del pytest predeterminado en local:
 
-Las ejecuciones en `main` no cancelan una publicación que ya esté en curso. Si
-se reejecuta únicamente publicación, se descarga el paquete previamente probado;
-no se recompila. Las releases son de desarrollo mientras siga pendiente la
-validación física de la AE-5.
+```bash
+python -m pytest                   # Sin compilar .deb
+python -m pytest -m package        # Pruebas de empaquetado bajo demanda
+python3 packaging/build_deb.py    # Construcción manual explícita
+```
+
+Las PR no reciben secretos de firma ni permisos de publicación. Solo el job de
+release etiquetada usa `contents: write` y los secretos. La release comienza
+como borrador y se publica después de descargar y verificar checksums y firma.
+Las releases y etiquetas históricas no se eliminan al introducir este cambio.
 
 ### Secretos de firma
 
@@ -175,7 +181,7 @@ Los secretos del repositorio usados por el job de publicación son:
 - `DEB_SIGNING_KEY`: contenido PEM de tu clave privada cifrada.
 - `DEB_SIGNING_PASSWORD`: contraseña de esa clave.
 
-La firma se ejecuta automáticamente tras las comprobaciones de `main`. Si falta
+La firma solo se ejecuta tras validar una etiqueta Git de versión. Si falta
 algún secreto o la clave no funciona, el job falla antes de crear la release. Los
 archivos privados se crean en el directorio temporal del runner, con permisos
 restringidos, y se eliminan al terminar el paso. Se publican solamente el `.deb`,

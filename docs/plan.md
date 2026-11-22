@@ -45,17 +45,18 @@ comportamiento. No se pospone íntegramente a una release final.
 
 El flujo de integración es TBD: ramas cortas y PR hacia `main`, con revisión y
 el check `CI required` antes de fusionar. No se hace push directo a `main`.
-La publicación automática ocurre después de integrar, desde `main`.
+La publicación ocurre únicamente al enviar una etiqueta Git de versión `v*` sobre un commit integrado en `main`.
 
-Se reutiliza la rama `codex/ae5ctl-deb-signing`, partiendo de `main` para cada
-PR. Tras fusionar se elimina la rama remota; el borrado comprueba que su punta
-sigue siendo la integrada para conservar cualquier trabajo posterior.
+La PR de desarrollo actual se mantiene en `feat/cli-ux-help`. No se crean ni se
+eliminan etiquetas de release al fusionar; el empaquetado se ejecuta solo con
+etiqueta de PR `build-deb` o etiqueta Git de versión.
 
 ## Empaquetado adelantado
 
 A petición del usuario, se adelanta de la fase 05 la generación de paquetes
 `.deb` de la CLI actual, su firma con una clave OpenSSL cifrada y su publicación
-automática mediante CI/CD tras superar las comprobaciones de `main`. Las
+solo bajo demanda: etiqueta de PR `build-deb` para validar y etiqueta Git
+`v<version>` después de fusionar en `main` para publicar. Las
 instrucciones están en [Paquetes .deb y firma OpenSSL](deb-packages.md). Esto no
 añade funcionalidades de audio ni resuelve la suspensión. Las compilaciones se
 publican como prereleases; la elección de licencia, la validación con hardware y

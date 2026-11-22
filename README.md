@@ -57,6 +57,19 @@ perfiles de PipeWire o rutas de aplicaciones. Si el sonido dependía de esos
 ajustes, compare los perfiles originales antes de sustituir la aplicación GTK.
 No se han probado todavía los cambios físicos en el equipo real.
 
+## CI/CD: paquetes solo con etiqueta
+
+Las PR ordinarias y los commits a `main` pasan lint y tests sin construir
+archivos `.deb`. Para activar la validación Debian de una PR, se aplica
+la etiqueta de GitHub `build-deb`; para publicar se envía una etiqueta Git
+de versión `v<version>` apuntando a un commit integrado en `main`.
+Ninguna etiqueta está aplicada a la PR #4.
+
+El pytest habitual excluye las pruebas que generan paquetes. Para ejecutarlas
+expresamente: `python -m pytest -m package`. Los paquetes solo se conservan
+en GitHub Releases cuando publicamos una versión; no se suben artefactos
+intermedios a GitHub Actions. Más detalles en [empaquetado](docs/deb-packages.md).
+
 ## Comparar perfiles ALSA originales (solo lectura)
 
 El antiguo `ae5-switcher.py` llamaba a `alsactl restore` con dos instantáneas
