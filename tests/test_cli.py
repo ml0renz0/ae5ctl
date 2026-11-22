@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from ae5ctl import cli
-from ae5ctl.alsa import AlsaBackend, AlsaError, Card, EnumControl, Status
+from ae5ctl.alsa import AlsaBackend, AlsaError, Card, EnumControl, Status, SwitchResult
 
 
 @pytest.fixture
@@ -19,11 +19,19 @@ def backend(monkeypatch):
         items={0: "Speakers", 1: "Headphone"},
         values=(1,),
     )
-    instance = Mock(spec=["cards", "status"])
+    instance = Mock(spec=["cards", "status", "switch", "toggle"])
     instance.cards.return_value = [card]
     instance.status.return_value = Status(
         card=card, control=control, output="headphones"
     )
+    after = Status(card=card, control=control, output="speakers")
+    outcome = SwitchResult(
+        before=instance.status.return_value,
+        after=after,
+        changed=True,
+    )
+    instance.switch.return_value = outcome
+    instance.toggle.return_value = outcome
     factory = Mock(return_value=instance)
     monkeypatch.setattr(cli, "AlsaBackend", factory)
     return instance, factory
@@ -220,7 +228,8 @@ def test_help_does_not_instantiate_backend(backend, capsys, argv):
 @pytest.mark.parametrize(
     "argv",
     [
-        ["switch", "headphones"],
+        ["switch"],
+        ["switch", "invalid"],
         ["status", "--numid", "0"],
         ["status", "--numid", "-1"],
         ["status", "--numid", "not-a-number"],
@@ -325,6 +334,11 @@ def test_no_arguments_displays_main_help_without_alsa(backend, capsys):
             ["doctor", "--help"],
             ("--json", "--card", "--timeout", "PipeWire", "EJEMPLOS"),
         ),
+        (
+            ["switch", "--help"],
+            ("--card", "--numid", "headphones", "speakers", "EJEMPLOS"),
+        ),
+        (["toggle", "--help"], ("--card", "--numid", "EJEMPLOS")),
     ],
 )
 def test_help_explains_usage_without_accessing_hardware(
@@ -381,3 +395,53 @@ def test_json_error_does_not_include_human_hint(backend, capsys):
     assert json.loads(captured.out) == {
         "error": {"code": "card_not_found", "message": "Tarjeta no detectada"}
     }
+
+
+@pytest.mark.parametrize(
+    "argv, method, expected_args",
+    [
+        (["switch", "speakers"], "switch", ("speakers",)),
+        (["toggle"], "toggle", ()),
+    ],
+)
+def test_output_actions_expose_readback_json(backend, capsys, argv, method, expected_args):
+    instance, _ = backend
+    assert cli.main([*argv, "--card", "Creative", "--numid", "37", "--json"]) == 0
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    assert captured.err == ""
+    assert report["scope"] == "alsa"
+    assert report["previous_output"] == "headphones"
+    assert report["output"] == "speakers"
+    assert report["changed"] is True
+    getattr(instance, method).assert_called_once_with(
+        *expected_args, card="Creative", numid=37
+    )
+
+
+def test_switch_text_explains_scope(backend, capsys):
+    assert cli.main(["switch", "speakers"]) == 0
+    output = capsys.readouterr().out
+    assert "headphones" in output
+    assert "speakers" in output
+    assert "perfiles" in output
+
+
+def test_write_verification_failure_preserves_json_contract(backend, capsys):
+    instance, _ = backend
+    instance.switch.side_effect = AlsaError("verify_failed", "No confirmado")
+    assert cli.main(["switch", "speakers", "--json"]) == 4
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert json.loads(captured.out) == {
+        "error": {"code": "verify_failed", "message": "No confirmado"}
+    }
+
+
+def test_write_failure_shows_recovery_hint(backend, capsys):
+    instance, _ = backend
+    instance.toggle.side_effect = AlsaError("verify_failed", "No confirmado")
+    assert cli.main(["toggle"]) == 4
+    captured = capsys.readouterr()
+    assert "ae5ctl status" in captured.err
