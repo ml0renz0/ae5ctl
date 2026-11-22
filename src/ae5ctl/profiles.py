@@ -11,8 +11,11 @@ MAX_BYTES = 2 * 1024 * 1024
 MAX_DEPTH = 12
 
 _ROUTING = re.compile(r"output|route|selector|mux|port|channel|jack", re.I)
-_LEVEL = re.compile(r"volume|gain|boost|attenuat|level|mute", re.I)
-_DSP = re.compile(r"crystal|surround|equaliz|eq\b|bass|treble|scout|dialog|effect|dsp", re.I)
+_LEVEL = re.compile(r"volume|gain|boost|attenuat|level|mute|playback switch", re.I)
+_DSP = re.compile(
+    r"crystal|surround|equaliz|eq\\b|bass|treble|scout|dialog|effect|dsp",
+    re.I,
+)
 
 
 class ProfileError(Exception):
@@ -123,8 +126,12 @@ def parse_state(text: str) -> dict[str, dict]:
                 for key, val in data.items()
                 if key == "value" or key.startswith("value.")
             }
-            if not raw_values or any(not isinstance(v, str) for v in raw_values.values()):
-                raise _syntax(f"Valores ausentes o no simples en {card_key}/{control_key}.")
+            if not raw_values or any(
+                not isinstance(value, str) for value in raw_values.values()
+            ):
+                raise _syntax(
+                    f"Valores ausentes o no simples en {card_key}/{control_key}."
+                )
             control = StoredControl(
                 numid=int(control_key.split(".", 1)[1]),
                 iface=iface,
@@ -154,7 +161,9 @@ def load_state(path: Path) -> dict[str, dict]:
     except FileNotFoundError as exc:
         raise ProfileError("file_missing", f"No existe: {resolved}") from exc
     except OSError as exc:
-        raise ProfileError("unreadable_file", f"No se puede leer {resolved}: {exc}") from exc
+        raise ProfileError(
+            "unreadable_file", f"No se puede leer {resolved}: {exc}"
+        ) from exc
     if len(data) > MAX_BYTES:
         raise ProfileError("file_too_large", f"El perfil supera 2 MiB: {resolved}")
     try:
