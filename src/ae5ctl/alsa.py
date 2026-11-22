@@ -370,10 +370,7 @@ class AlsaBackend:
         # Re-read immediately before writing: another client or a driver reset
         # may have changed the selected value or reassigned this numid.
         current = self._control(before.card, before.control.numid)
-        if (
-            current.name != before.control.name
-            or current.items != before.control.items
-        ):
+        if current.name != before.control.name or current.items != before.control.items:
             raise AlsaError(
                 "control_changed",
                 "El control ALSA cambió después de la lectura inicial. "

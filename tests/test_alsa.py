@@ -466,6 +466,7 @@ def test_invalid_output_is_rejected_without_alsa(make_backend):
         backend.switch("auto")
     runner.assert_not_called()
 
+
 def test_prewrite_guard_rejects_external_state_change(make_backend):
     """Another application wins the race; no stale ALSA write is attempted."""
     reads = {"count": 0}
