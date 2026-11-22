@@ -62,9 +62,10 @@ def run_validation(
     try:
         if not _heard(ask, "¿Se oye la salida inicial? [s/N] "):
             failure = "No se confirmó audio en la salida inicial."
-        elif ask(
-            f"Escribe CAMBIAR para pasar a {plan.target} [cancelar]: "
-        ).strip() != "CAMBIAR":
+        elif (
+            ask(f"Escribe CAMBIAR para pasar a {plan.target} [cancelar]: ").strip()
+            != "CAMBIAR"
+        ):
             failure = "La escritura ALSA no ha sido autorizada."
         else:
             attempted = True

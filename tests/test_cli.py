@@ -568,17 +568,13 @@ def test_tray_invalid_args_fail_before_loading_gui(backend, capsys, args):
     factory.assert_not_called()
 
 
-def test_validate_cli_delegates_flags_without_gui_or_alsa_writes(
-    backend, monkeypatch
-):
+def test_validate_cli_delegates_flags_without_gui_or_alsa_writes(backend, monkeypatch):
     from ae5ctl import validation
 
     requested = Mock(return_value=0)
     monkeypatch.setattr(validation, "run_validation", requested)
     assert cli.main(["validate", "--apply", "--card", "Creative", "--numid", "43"]) == 0
-    requested.assert_called_once_with(
-        backend, card="Creative", numid=43, apply=True
-    )
+    requested.assert_called_once_with(backend, card="Creative", numid=43, apply=True)
 
 
 def test_validate_help_does_not_access_hardware(backend, capsys):

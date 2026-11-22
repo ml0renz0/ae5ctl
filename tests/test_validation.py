@@ -61,9 +61,12 @@ def answers(*values):
 def test_read_only_is_default_and_never_prompts():
     backend = FakeBackend()
     text = []
-    assert run_validation(
-        backend, ask=lambda _: pytest.fail("unexpected prompt"), say=text.append
-    ) == 0
+    assert (
+        run_validation(
+            backend, ask=lambda _: pytest.fail("unexpected prompt"), say=text.append
+        )
+        == 0
+    )
     assert backend.writes == []
     assert any("SOLO LECTURA" in line for line in text)
 
@@ -92,9 +95,7 @@ def test_refusing_audio_or_consent_never_writes(responses):
 
 def test_unheard_alternate_output_is_restored_and_fails():
     backend = FakeBackend()
-    assert run_validation(
-        backend, apply=True, ask=answers("s", "CAMBIAR", "n")
-    ) == 5
+    assert run_validation(backend, apply=True, ask=answers("s", "CAMBIAR", "n")) == 5
     assert backend.writes == ["speakers", "headphones"]
     assert backend.output == "headphones"
 
@@ -117,9 +118,12 @@ def test_readback_failure_after_write_still_attempts_to_restore():
     backend = FakeBackend()
     backend.error_on_first = "verify_failed"
     text = []
-    assert run_validation(
-        backend, apply=True, ask=answers("s", "CAMBIAR"), say=text.append
-    ) == 5
+    assert (
+        run_validation(
+            backend, apply=True, ask=answers("s", "CAMBIAR"), say=text.append
+        )
+        == 5
+    )
     assert backend.writes == ["speakers", "headphones"]
     assert backend.output == "headphones"
     assert any("Validación incompleta" in line for line in text)
@@ -129,9 +133,7 @@ def test_readback_failure_after_write_still_attempts_to_restore():
 def test_refused_write_does_not_undo_external_state(code):
     backend = FakeBackend()
     backend.error_on_first = code
-    assert run_validation(
-        backend, apply=True, ask=answers("s", "CAMBIAR")
-    ) == 5
+    assert run_validation(backend, apply=True, ask=answers("s", "CAMBIAR")) == 5
     assert backend.writes == []
 
 
@@ -139,12 +141,15 @@ def test_restore_failure_reports_uncertainty_and_no_pass():
     backend = FakeBackend()
     backend.restore_error = True
     text = []
-    assert run_validation(
-        backend,
-        apply=True,
-        ask=answers("s", "CAMBIAR", "s"),
-        say=text.append,
-    ) == 5
+    assert (
+        run_validation(
+            backend,
+            apply=True,
+            ask=answers("s", "CAMBIAR", "s"),
+            say=text.append,
+        )
+        == 5
+    )
     assert backend.output == "speakers"
     assert any("ALERTA" in line for line in text)
     assert not any("PASS" in line for line in text)
