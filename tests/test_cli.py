@@ -457,9 +457,7 @@ def test_tray_delegates_without_instantiating_cli_backend(backend, monkeypatch):
     start = Mock(return_value=0)
     monkeypatch.setattr(tray, "run_tray", start)
     assert cli.main(["tray", "--card", "Creative", "--interval", "7"]) == 0
-    start.assert_called_once_with(
-        card="Creative", numid=None, timeout=3.0, interval=7
-    )
+    start.assert_called_once_with(card="Creative", numid=None, timeout=3.0, interval=7)
     factory.assert_not_called()
 
 

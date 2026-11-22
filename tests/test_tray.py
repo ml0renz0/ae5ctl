@@ -59,9 +59,7 @@ def test_initial_refresh_reads_alsa_without_blocking(harness):
 @pytest.mark.parametrize("mode", ["speakers", "headphones"])
 def test_switch_and_readback_status(harness, mode):
     controller, backend, updates, _, _, finish = harness
-    backend.switch.return_value = SimpleNamespace(
-        after=SimpleNamespace(output=mode)
-    )
+    backend.switch.return_value = SimpleNamespace(after=SimpleNamespace(output=mode))
     assert controller.request(mode) is True
     finish()
     backend.switch.assert_called_once_with(mode, card="Creative", numid=43)
@@ -103,17 +101,21 @@ def test_failure_reports_error_and_clears_stale_state(harness):
 
 
 def test_shutdown_ignores_late_callbacks(harness):
-    controller, backend, updates, _, ui_queue, _ = harness
+    controller, backend, updates, workers, ui_queue, _ = harness
     backend.status.return_value = SimpleNamespace(output="speakers")
     assert controller.request("refresh")
     controller.close()
     initial = len(updates)
     assert controller.request("toggle") is False
     assert len(ui_queue) == 0
-    # A worker may finish after the user has closed the window.
-    controller.thread_factory = lambda **kwargs: None
+
+    # The in-flight worker may return after the user closes the tray.
+    workers.pop(0)()
+    assert len(ui_queue) == 1
+    assert ui_queue.pop(0)() is False
     assert controller.closed is True
     assert len(updates) == initial
+    backend.toggle.assert_not_called()
 
 
 def test_invalid_operation_does_not_start_thread(harness):

@@ -158,9 +158,7 @@ def run_tray(
             status_item.set_label("AE-5: consultando...")
         else:
             names = {"headphones": "auriculares", "speakers": "altavoces"}
-            status_item.set_label(
-                f"Salida ALSA: {names.get(state, 'desconocida')}"
-            )
+            status_item.set_label(f"Salida ALSA: {names.get(state, 'desconocida')}")
         headphones.set_sensitive(not busy and state != "headphones")
         speakers.set_sensitive(not busy and state != "speakers")
         toggle.set_sensitive(not busy and state is not None)
