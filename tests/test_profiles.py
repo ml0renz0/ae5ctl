@@ -294,7 +294,9 @@ def doctor_backend(monkeypatch):
 def test_doctor_opt_in_profiles_joins_read_only_evidence(
     monkeypatch, doctor_backend, state_files, capsys
 ):
-    hp, spk = state_files(snapshot(volume="35"), snapshot(route="Speakers", volume="80"))
+    hp, spk = state_files(
+        snapshot(volume="35"), snapshot(route="Speakers", volume="80")
+    )
     monkeypatch.setattr(cli, "HEADPHONES_FILE", hp)
     monkeypatch.setattr(cli, "SPEAKERS_FILE", spk)
     monkeypatch.setattr(
