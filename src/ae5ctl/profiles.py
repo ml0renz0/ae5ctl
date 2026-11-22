@@ -12,7 +12,7 @@ MAX_DEPTH = 12
 
 _ROUTING = re.compile(r"output|route|selector|mux|port|channel|jack", re.I)
 _LEVEL = re.compile(r"volume|gain|boost|attenuat|level|mute", re.I)
-_DSP = re.compile(r"crystal|surround|equaliz|eq\\b|bass|treble|scout|dialog|effect|dsp", re.I)
+_DSP = re.compile(r"crystal|surround|equaliz|eq\b|bass|treble|scout|dialog|effect|dsp", re.I)
 
 
 class ProfileError(Exception):
@@ -106,7 +106,7 @@ def parse_state(text: str) -> dict[str, dict]:
             raise _syntax("El identificador de tarjeta ALSA está vacío.")
         controls: dict[tuple, StoredControl] = {}
         for control_key, data in body.items():
-            if not re.fullmatch(r"control\\.[0-9]+", control_key):
+            if not re.fullmatch(r"control\.[0-9]+", control_key):
                 raise _syntax(f"Bloque ALSA no reconocido: {control_key!r}.")
             if not isinstance(data, dict):
                 raise _syntax(f"El control {control_key} no es un bloque.")
