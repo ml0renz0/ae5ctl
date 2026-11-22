@@ -1,7 +1,10 @@
 # Paquetes .deb y firma OpenSSL
 
-El paquete contiene la CLI de lectura y conmutación del selector ALSA. No incluye la bandeja GTK,
-perfiles de audio, servicios, reglas de suspensión ni recuperación automática.
+El paquete contiene la CLI de lectura y conmutación del selector ALSA y el
+subcomando opcional `tray`. No instala las dependencias GTK automáticamente ni
+incluye perfiles de audio, servicios, reglas de suspensión o reparación automática.
+`doctor --pipewire` necesita `pactl` (`pulseaudio-utils`) solo cuando se solicita;
+ambos conjuntos de dependencias opcionales se indican mediante `Suggests`.
 La licencia sigue pendiente de elección. La publicación automática de builds
 no concede por sí misma permisos de redistribución del código.
 
