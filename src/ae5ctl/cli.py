@@ -309,12 +309,9 @@ def doctor(backend: AlsaBackend, args: argparse.Namespace) -> int:
         if args.pipewire:
             session = report["audio_session"]
             if session["available"]:
+                print(f"Servidor de audio: {session['server_name'] or 'desconocido'}")
                 print(
-                    f"Servidor de audio: {session['server_name'] or 'desconocido'}"
-                )
-                print(
-                    f"Salida predeterminada: "
-                    f"{session['default_sink'] or 'no indicada'}"
+                    f"Salida predeterminada: {session['default_sink'] or 'no indicada'}"
                 )
                 for sink in session["sinks"]:
                     print(f"Salida disponible: {sink['name']} ({sink['state']})")
