@@ -74,6 +74,8 @@ def run_validation(
                     plan.target, card=pinned_card, numid=pinned_numid
                 )
                 if not switched.changed:
+                    # No write was made: do not undo another client's selection.
+                    attempted = False
                     failure = "La salida ya había cambiado; prueba no concluyente."
                 else:
                     alternate_audible = _heard(

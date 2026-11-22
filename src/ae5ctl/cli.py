@@ -267,7 +267,7 @@ def parser() -> argparse.ArgumentParser:
                 "--json", action="store_true", help="imprimir JSON para scripts"
             )
             continue
-        if name != "tray":
+        if name not in {"tray", "validate"}:
             command.add_argument(
                 "--json", action="store_true", help="imprimir JSON para scripts"
             )

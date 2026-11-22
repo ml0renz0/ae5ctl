@@ -168,3 +168,20 @@ def test_initial_selection_moved_during_plan_aborts_without_writing():
         run_validation(backend, apply=True, ask=lambda _: pytest.fail("prompt"))
     assert caught.value.code == "state_changed"
     assert backend.writes == []
+
+
+def test_external_switch_to_target_is_not_undone():
+    backend = FakeBackend()
+
+    def external_switch(output, card=None, numid=None):
+        before = backend.status(card=card, numid=numid)
+        backend.output = output
+        return SwitchResult(before, backend.status(card=card, numid=numid), False)
+
+    backend.switch = external_switch
+    text = []
+    assert run_validation(
+        backend, apply=True, ask=answers("s", "CAMBIAR"), say=text.append
+    ) == 5
+    assert backend.output == "speakers"
+    assert not any("Intentando restaurar" in line for line in text)
