@@ -19,6 +19,34 @@ Las fases 00 y 01 preparan documentación, pruebas, CI y diagnóstico de lectura
 reanudar Ubuntu: cambiar de estéreo a 5.1 y volver a estéreo desde Ajustes → Sonido
 recupera el audio, según lo observado por el usuario. Su causa sigue pendiente.
 
+## Uso rápido
+
+La ayuda es autocontenida y no necesita hardware ni entorno gráfico:
+
+```bash
+ae5ctl                    # Mostrar la ayuda general
+ae5ctl --help             # Comandos, ejemplos, límites y códigos de salida
+ae5ctl --version          # Versión instalada
+ae5ctl cards --help       # Ayuda para listar dispositivos
+ae5ctl status --help      # Opciones --card, --numid y --timeout
+ae5ctl doctor --help      # Diagnóstico y limitaciones
+```
+
+La versión actual **solo consulta** ALSA. Para descubrir la tarjeta y leer el estado
+del selector:
+
+```bash
+ae5ctl cards
+ae5ctl status
+ae5ctl doctor --json
+```
+
+Si `status` no identifica la tarjeta de forma inequívoca, use el ID mostrado en
+`cards` con `--card`; indique `--numid` únicamente si hay varios selectores
+o conoce su identificador. Las opciones PipeWire/WirePlumber todavía no se
+inspeccionan desde `doctor`. Los errores en formato texto muestran una sugerencia
+de resolución; las respuestas JSON conservan su estructura para automatizaciones.
+
 ## Instalación y consultas
 
 Se necesita Linux y Python 3.10 o posterior. `status` y `doctor` utilizan `amixer`,
