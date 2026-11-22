@@ -6,6 +6,7 @@ import math
 import sys
 from dataclasses import asdict
 
+from ae5ctl import __version__
 from ae5ctl.alsa import AlsaBackend, AlsaError, Status
 
 SELECTION_ERRORS = {
@@ -19,8 +20,32 @@ SELECTION_ERRORS = {
 DIAGNOSTIC_NOTES = [
     "Solo se consulta ALSA; no se cambia ningún control ni perfil de audio.",
     "La selección ALSA no demuestra que salga audio por el conector esperado.",
-    "Los perfiles de Ubuntu y el fallo tras suspensión requieren diagnóstico adicional.",
+    "No se inspeccionan perfiles ni rutas PipeWire/WirePlumber.",
 ]
+
+
+ERROR_HINTS = {
+    "no_card": "Compruebe la conexión con 'ae5ctl cards' y 'cat /proc/asound/cards'.",
+    "card_not_found": "Ejecute 'ae5ctl cards' y use el ID indicado con --card.",
+    "ambiguous_card": "Ejecute 'ae5ctl cards' e indique --card ID_ALSA.",
+    "no_control": (
+        "Verifique la tarjeta con 'ae5ctl cards' y examine sus controles con amixer."
+    ),
+    "ambiguous_control": (
+        "Use 'amixer -c ID_ALSA controls' para identificar el selector "
+        "y luego --numid N."
+    ),
+    "unknown_output": (
+        "Revise el selector indicado con 'amixer -c ID_ALSA cget numid=N'."
+    ),
+    "command_missing": "Instale alsa-utils (Ubuntu: 'sudo apt install alsa-utils').",
+    "command_timeout": "Pruebe --timeout 10 y compruebe que ALSA responde.",
+    "command_failed": "Revise el mensaje de amixer y los permisos de la tarjeta ALSA.",
+    "parse_error": (
+        "Guarde 'ae5ctl doctor --json' para reportar un formato ALSA no reconocido."
+    ),
+    "unreadable_cards": "Compruebe los permisos de /proc/asound/cards.",
+}
 
 
 def positive_int(value: str) -> int:
@@ -48,27 +73,90 @@ def positive_timeout(value: str) -> float:
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
         prog="ae5ctl",
-        description="Consulta tarjetas y salida ALSA sin cambiar la configuración.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Control y diagnóstico de Sound BlasterX AE-5 en Linux.\n"
+            "Versión actual: consultas ALSA de solo lectura; NO cambia el audio."
+        ),
+        epilog=(
+            "EJEMPLOS\n"
+            "  ae5ctl cards                Lista tarjetas y sus ID ALSA\n"
+            "  ae5ctl status               Consulta la salida seleccionada\n"
+            "  ae5ctl status --card Creative --json\n"
+            "  ae5ctl doctor --json        Diagnóstico estructurado\n\n"
+            "AYUDA DETALLADA\n"
+            "  ae5ctl <comando> --help\n\n"
+            "CÓDIGOS DE SALIDA\n"
+            "  0 correcto · 2 argumentos · 3 selección · 4 error ALSA\n\n"
+            "Más información: https://github.com/ml0renz0/ae5ctl"
+        ),
     )
-    commands = root.add_subparsers(dest="command", required=True)
+    root.add_argument(
+        "-V", "--version", action="version", version=f"%(prog)s {__version__}",
+        help="mostrar la versión instalada y salir",
+    )
+    commands = root.add_subparsers(dest="command", required=True, metavar="COMANDO")
+    details = {
+        "cards": (
+            "Lista todas las tarjetas ALSA. No consulta ni modifica controles.",
+            "EJEMPLOS\n"
+            "  ae5ctl cards\n"
+            "  ae5ctl cards --json\n\n"
+            "Use el ID entre corchetes en status --card ID_ALSA."
+        ),
+        "status": (
+            "Lee la salida del selector de auriculares/altavoces de la AE-5.",
+            "EJEMPLOS\n"
+            "  ae5ctl status\n"
+            "  ae5ctl status --card Creative\n"
+            "  ae5ctl status --card Creative --numid 37 --json\n\n"
+            "Primero ejecute 'ae5ctl cards' para identificar el ID ALSA.\n"
+            "Use --numid solo si hay varios selectores o conoce el control.\n"
+            "La selección ALSA no garantiza que se oiga audio."
+        ),
+        "doctor": (
+            "Diagnostica la detección y lectura ALSA, sin reparar el audio.",
+            "EJEMPLOS\n"
+            "  ae5ctl doctor\n"
+            "  ae5ctl doctor --card Creative --json\n\n"
+            "No modifica perfiles PipeWire, controles ALSA ni servicios.\n"
+            "El diagnóstico PipeWire/WirePlumber todavía no está implementado."
+        ),
+    }
     for name, help_text in [
-        ("cards", "listar tarjetas ALSA"),
-        ("status", "leer la salida seleccionada en ALSA"),
-        ("doctor", "diagnosticar la lectura ALSA (no repara el audio)"),
+        ("cards", "listar tarjetas ALSA y obtener sus ID"),
+        ("status", "consultar la salida física seleccionada"),
+        ("doctor", "diagnosticar la lectura ALSA (sin reparar audio)"),
     ]:
-        command = commands.add_parser(name, help=help_text, description=help_text)
-        command.add_argument("--json", action="store_true", help="salida JSON")
+        description, epilog = details[name]
+        command = commands.add_parser(
+            name,
+            help=help_text,
+            description=description,
+            epilog=epilog,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+        command.add_argument(
+            "--json", action="store_true", help="imprimir JSON para scripts"
+        )
         if name != "cards":
-            command.add_argument("--card", help="ID ALSA exacto o índice de tarjeta")
             command.add_argument(
-                "--numid", type=positive_int, help="numid del selector de salida"
+                "--card",
+                metavar="ID_ALSA",
+                help="ID exacto o índice; consulte 'ae5ctl cards'",
+            )
+            command.add_argument(
+                "--numid",
+                type=positive_int,
+                metavar="N",
+                help="identificador del selector ALSA; opcional",
             )
             command.add_argument(
                 "--timeout",
                 type=positive_timeout,
                 default=3.0,
                 metavar="SEGUNDOS",
-                help="tiempo máximo por comando amixer (predeterminado: 3)",
+                help="límite por consulta amixer (predeterminado: 3)",
             )
     return root
 
@@ -96,6 +184,13 @@ def print_status(value: dict) -> None:
     print(f"Control: {control['name']} (numid={control['numid']})")
     print(f"Salida ALSA seleccionada: {value['output']}")
     print("Esta lectura no confirma que se oiga audio.")
+
+
+def print_error(error: AlsaError) -> None:
+    print(f"Error [{error.code}]: {error}", file=sys.stderr)
+    hint = ERROR_HINTS.get(error.code)
+    if hint:
+        print(f"Sugerencia: {hint}", file=sys.stderr)
 
 
 def doctor(backend: AlsaBackend, args: argparse.Namespace) -> int:
@@ -127,14 +222,18 @@ def doctor(backend: AlsaBackend, args: argparse.Namespace) -> int:
         if report["status"] is not None:
             print_status(report["status"])
         for error in report["errors"]:
-            print(f"Error [{error['code']}]: {error['message']}", file=sys.stderr)
+            print_error(AlsaError(error["code"], error["message"]))
         for note in report["notes"]:
             print(note)
     return result
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parser().parse_args(argv)
+    arguments = sys.argv[1:] if argv is None else argv
+    if not arguments:
+        parser().print_help()
+        return 0
+    args = parser().parse_args(arguments)
     backend = AlsaBackend(timeout=getattr(args, "timeout", 3.0))
     if args.command == "doctor":
         return doctor(backend, args)
@@ -158,6 +257,6 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print_json({"error": error_dict(error)})
         else:
-            print(f"Error [{error.code}]: {error}", file=sys.stderr)
+            print_error(error)
         return exit_code(error)
     return 0
