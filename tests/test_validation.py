@@ -180,8 +180,11 @@ def test_external_switch_to_target_is_not_undone():
 
     backend.switch = external_switch
     text = []
-    assert run_validation(
-        backend, apply=True, ask=answers("s", "CAMBIAR"), say=text.append
-    ) == 5
+    assert (
+        run_validation(
+            backend, apply=True, ask=answers("s", "CAMBIAR"), say=text.append
+        )
+        == 5
+    )
     assert backend.output == "speakers"
     assert not any("Intentando restaurar" in line for line in text)
