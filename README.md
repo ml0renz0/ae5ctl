@@ -34,6 +34,7 @@ ae5ctl switch --help      # Seleccionar una salida con verificación
 ae5ctl toggle --help      # Alternar la salida física ALSA
 ae5ctl tray --help        # Indicador GTK/Ayatana opcional
 ae5ctl doctor --help      # Diagnóstico y limitaciones
+ae5ctl profiles diff --help # Comparar perfiles alsactl guardados
 ```
 
 Para descubrir la tarjeta, comprobar la salida y conmutarla:
@@ -46,6 +47,7 @@ ae5ctl switch speakers
 ae5ctl toggle
 ae5ctl doctor --json
 ae5ctl doctor --pipewire --json  # Inspección opcional, solo lectura
+ae5ctl profiles diff --json       # Comparación sin escribir en ALSA
 ```
 
 **Advertencia:** `switch` y `toggle` escriben únicamente el control enumerado
@@ -54,6 +56,42 @@ de la tarjeta ALSA seleccionada. No restauran los perfiles
 perfiles de PipeWire o rutas de aplicaciones. Si el sonido dependía de esos
 ajustes, compare los perfiles originales antes de sustituir la aplicación GTK.
 No se han probado todavía los cambios físicos en el equipo real.
+
+## Comparar perfiles ALSA originales (solo lectura)
+
+El antiguo `ae5-switcher.py` llamaba a `alsactl restore` con dos instantáneas
+completas. La nueva conmutación directa solo escribe el selector físico;
+**no es equivalente a restaurar un perfil entero** si también cambian el
+volumen, los interruptores de reproducción, la ganancia o el DSP.
+
+Para identificar esas diferencias sin modificar dispositivos ni necesitar
+la tarjeta conectada:
+
+```bash
+ae5ctl profiles diff
+ae5ctl profiles diff --json
+ae5ctl profiles diff --headphones /ruta/auriculares.state \
+                     --speakers /ruta/altavoces.state
+```
+
+Los valores predeterminados proceden del script original:
+`~/.config/ae5-headphones.state` y `~/.config/ae5-speakers.state`. Si no
+existen, se devuelve un error explícito. No se crean ni se generan nuevos
+estados, y **nunca se invoca `alsactl restore` ni `amixer`** durante la
+comparación.
+
+El análisis empareja controles por tarjeta, interfaz, nombre, índice y
+subdispositivo, no por `control.N` (`numid`). Muestra todas las diferencias,
+incluidas las de otras tarjetas, y avisa si los archivos contienen varias.
+La clasificación de cambios en rutas, niveles/muteo, posible DSP y otros
+es orientativa, basada exclusivamente en nombres; no demuestra qué hace
+realmente un control. Los metadatos de comentarios `alsactl` no se comparan:
+solo los valores guardados. Los archivos deben ajustarse al formato habitual
+de `alsactl store` y no superar 2 MiB cada uno.
+
+**No restaure perfiles completos para probar esta función.** Antes de
+sustituir el script original será necesario revisar el resultado con los
+archivos reales del equipo. Las pruebas automáticas utilizan perfiles sintéticos.
 
 ## Indicador de bandeja (opcional)
 
