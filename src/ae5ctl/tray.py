@@ -1,10 +1,46 @@
 """Optional GTK/Ayatana tray that never runs ALSA commands on GTK's main loop."""
 
 import sys
+from dataclasses import dataclass
 from threading import Lock, Thread
 from typing import Callable
 
 from ae5ctl.alsa import AlsaBackend
+
+
+@dataclass(frozen=True)
+class TrayView:
+    """Presentation derived solely from confirmed state and loading/error flags."""
+
+    icon: str
+    label: str
+    headphones_enabled: bool
+    speakers_enabled: bool
+    toggle_enabled: bool
+    refresh_enabled: bool
+
+
+def tray_view(state: str | None, error: str | None, busy: bool) -> TrayView:
+    """Never offer output writes until ALSA has supplied a valid state."""
+    valid = state in {"headphones", "speakers"} and error is None and not busy
+    icons = {"headphones": "audio-headphones", "speakers": "audio-speakers"}
+    if error is not None:
+        # ALSA error messages can contain newlines; a menu label must not.
+        message = " ".join(error.split())[:100] or "Error desconocido"
+        label = f"Error ALSA: {message}"
+    elif busy:
+        label = "AE-5: consultando..."
+    else:
+        names = {"headphones": "auriculares", "speakers": "altavoces"}
+        label = f"Salida ALSA: {names.get(state, 'desconocida')}"
+    return TrayView(
+        icon=icons.get(state, "audio-card") if error is None else "audio-card",
+        label=label,
+        headphones_enabled=valid and state != "headphones",
+        speakers_enabled=valid and state != "speakers",
+        toggle_enabled=valid,
+        refresh_enabled=not busy,
+    )
 
 
 class TrayController:
@@ -33,6 +69,9 @@ class TrayController:
         self.closed = False
         self._resolved_card: str | None = None
         self._resolved_numid: int | None = None
+        # A numeric --card is pinned to its first real ALSA ID. Hotplug must
+        # not silently redirect the tray to a different card at the same index.
+        self._pinned_card: str | None = None
         self._lock = Lock()
 
     def request(self, operation: str) -> bool:
@@ -50,11 +89,18 @@ class TrayController:
             error: str | None = None
             resolved_card: str | None = None
             resolved_numid: int | None = None
-            try:
+            with self._lock:
+                # Closing before a queued worker starts must not trigger cset.
+                if self.closed:
+                    return
+                selected_card = self.card or self._resolved_card
+                if self.card and self.card.isdecimal() and self._pinned_card:
+                    selected_card = self._pinned_card
                 options = {
-                    "card": self.card or self._resolved_card,
+                    "card": selected_card,
                     "numid": self.numid or self._resolved_numid,
                 }
+            try:
                 if operation == "refresh":
                     status = self.backend.status(**options)
                 elif operation == "toggle":
@@ -82,6 +128,13 @@ class TrayController:
                     # Clear stale references after hardware disappears or fails.
                     self._resolved_card = resolved_card
                     self._resolved_numid = resolved_numid
+                    if (
+                        resolved_card is not None
+                        and self.card
+                        and self.card.isdecimal()
+                        and self._pinned_card is None
+                    ):
+                        self._pinned_card = resolved_card
                 self.on_update(state, error, False)
                 return False
 
@@ -91,10 +144,14 @@ class TrayController:
             self.thread_factory(
                 target=worker, daemon=True, name="ae5ctl-tray-alsa"
             ).start()
-        except RuntimeError as exc:
+        except (RuntimeError, OSError) as exc:
             with self._lock:
+                if self.closed:
+                    return False
                 self.busy = False
                 self.state = None
+                self._resolved_card = None
+                self._resolved_numid = None
             self.on_update(None, str(exc), False)
             return False
         return True
@@ -102,6 +159,7 @@ class TrayController:
     def close(self) -> None:
         with self._lock:
             self.closed = True
+            self.busy = False
 
 
 class TrayUnavailable(RuntimeError):
@@ -167,20 +225,13 @@ def run_tray(
     menu.append(quit_item)
 
     def update(state: str | None, error: str | None, busy: bool) -> None:
-        icons = {"headphones": "audio-headphones", "speakers": "audio-speakers"}
-        icon = icons.get(state, "audio-card")
-        indicator.set_icon_full(icon, "AE-5")
-        if error is not None:
-            status_item.set_label(f"Error ALSA: {error[:100]}")
-        elif busy:
-            status_item.set_label("AE-5: consultando...")
-        else:
-            names = {"headphones": "auriculares", "speakers": "altavoces"}
-            status_item.set_label(f"Salida ALSA: {names.get(state, 'desconocida')}")
-        headphones.set_sensitive(not busy and state != "headphones")
-        speakers.set_sensitive(not busy and state != "speakers")
-        toggle.set_sensitive(not busy and state is not None)
-        refresh.set_sensitive(not busy)
+        view = tray_view(state, error, busy)
+        indicator.set_icon_full(view.icon, "AE-5")
+        status_item.set_label(view.label)
+        headphones.set_sensitive(view.headphones_enabled)
+        speakers.set_sensitive(view.speakers_enabled)
+        toggle.set_sensitive(view.toggle_enabled)
+        refresh.set_sensitive(view.refresh_enabled)
 
     controller = TrayController(
         AlsaBackend(timeout=timeout),

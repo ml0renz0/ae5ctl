@@ -140,6 +140,11 @@ preservar el modo CLI sin escritorio. En un entorno virtual, cree el venv con
 `python3 -m venv --system-site-packages .venv` para acceder a `python3-gi`
 instalado con APT. El indicador necesita una sesión gráfica y soporte de
 indicadores del escritorio; su aspecto puede variar entre GNOME y otras sesiones.
+Si ALSA falla o el estado es desconocido, el menú desactiva las acciones que
+escriben en el hardware hasta que una lectura posterior confirme la salida;
+«Actualizar estado» permanece disponible. Si el usuario eligió un índice
+numérico de tarjeta, la bandeja lo fija al ID ALSA detectado para no cambiar
+silenciosamente a otra tarjeta cuando el índice se reutilice tras un hotplug.
 No se configura arranque automático hasta validar el comportamiento en la AE-5
 física. Tampoco restaura perfiles `alsactl` ni modifica PipeWire.
 

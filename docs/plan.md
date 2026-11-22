@@ -102,6 +102,17 @@ de modo que las otras órdenes y CI continúan funcionando sin GTK. No hay
 autostart ni restauración de perfiles. Pendiente probar el indicador y el
 control de la tarjeta real en Ubuntu GNOME.
 
+## Robustez de la bandeja (PR #4)
+
+La lógica visual se calcula mediante una función pura que deshabilita las
+operaciones de escritura cuando el estado es desconocido, hay error o se
+ejecuta una consulta. El refresco manual sigue disponible después de fallos.
+Una petición que todavía no ha arrancado queda descartada si se cierra el
+indicador; los callbacks de operaciones ya iniciadas no actualizan una UI
+cerrada. Si se seleccionó la tarjeta por índice numérico, se conserva su
+identificador ALSA real para impedir cambios accidentales de dispositivo
+después de una desconexión. Las pruebas se ejecutan sin GTK ni hardware.
+
 ## Previsualización y protección de cambios ALSA (PR #4)
 
 `ae5ctl switch speakers --dry-run` y `ae5ctl toggle --dry-run` muestran
