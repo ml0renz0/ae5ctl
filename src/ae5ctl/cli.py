@@ -307,9 +307,7 @@ def main(argv: list[str] | None = None) -> int:
                 print_status(status)
         else:
             if args.command == "switch":
-                changed = backend.switch(
-                    args.output, card=args.card, numid=args.numid
-                )
+                changed = backend.switch(args.output, card=args.card, numid=args.numid)
             else:
                 changed = backend.toggle(card=args.card, numid=args.numid)
             outcome = switch_dict(changed)

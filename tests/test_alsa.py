@@ -411,9 +411,7 @@ def test_toggle_uses_live_state_for_each_invocation(make_backend):
     assert backend.toggle().after.output == "headphones"
     assert selected["value"] == 2
     writes = [
-        call.args[0][-1]
-        for call in runner.call_args_list
-        if "cset" in call.args[0]
+        call.args[0][-1] for call in runner.call_args_list if "cset" in call.args[0]
     ]
     assert writes == ["1", "2"]
 

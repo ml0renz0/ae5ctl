@@ -344,9 +344,7 @@ class AlsaBackend:
             raise ValueError("La salida debe ser headphones o speakers.")
         return self._change(self.status(card=card, numid=numid), output)
 
-    def toggle(
-        self, card: str | None = None, numid: int | None = None
-    ) -> SwitchResult:
+    def toggle(self, card: str | None = None, numid: int | None = None) -> SwitchResult:
         """Toggle from live ALSA state, never a remembered marker."""
         before = self.status(card=card, numid=numid)
         target = "speakers" if before.output == "headphones" else "headphones"
