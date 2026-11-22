@@ -16,7 +16,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ae5ctl.alsa import AlsaBackend
-from ae5ctl.profiles import HEADPHONES_FILE, SPEAKERS_FILE, ProfileError, compare_profiles
+from ae5ctl.profiles import (
+    HEADPHONES_FILE,
+    SPEAKERS_FILE,
+    ProfileError,
+    compare_profiles,
+)
 from ae5ctl.validation import run_validation
 
 
