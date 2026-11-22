@@ -150,6 +150,104 @@ def test_text_error_uses_stderr(backend, capsys):
     assert "Select a card" in captured.err
 
 
+def test_doctor_pipewire_is_opt_in_and_preserves_alsa_exit_code(
+    backend, monkeypatch, capsys
+):
+    probe = Mock(
+        return_value={
+            "available": True,
+            "server_kind": "pipewire",
+            "server_name": "PulseAudio (on PipeWire 1.0)",
+            "default_sink": "alsa_output.pci-0000_01_00.0",
+            "sinks": [],
+            "cards": [],
+            "errors": [],
+            "notes": [],
+        }
+    )
+    monkeypatch.setattr(cli, "inspect_audio_session", probe)
+    assert cli.main(["doctor", "--pipewire", "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["audio_session"]["server_kind"] == "pipewire"
+    assert report["ok"] is True
+    probe.assert_called_once_with(timeout=3.0)
+
+    assert cli.main(["doctor", "--json"]) == 0
+    assert "audio_session" not in json.loads(capsys.readouterr().out)
+    assert probe.call_count == 1
+
+
+def test_missing_pactl_does_not_fail_valid_alsa_doctor(backend, monkeypatch, capsys):
+    probe = Mock(
+        return_value={
+            "available": False,
+            "server_kind": "unknown",
+            "server_name": None,
+            "default_sink": None,
+            "sinks": [],
+            "cards": [],
+            "errors": [{"code": "command_missing", "message": "pactl no existe"}],
+            "notes": [],
+        }
+    )
+    monkeypatch.setattr(cli, "inspect_audio_session", probe)
+    assert cli.main(["doctor", "--pipewire", "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["ok"] is True
+    assert report["audio_session"]["available"] is False
+    assert report["audio_session"]["errors"][0]["code"] == "command_missing"
+
+
+def test_optional_audio_diagnostics_run_even_when_alsa_fails(
+    backend, monkeypatch, capsys
+):
+    instance, _ = backend
+    instance.status.side_effect = AlsaError("no_control", "Sin selector")
+    probe = Mock(
+        return_value={
+            "available": True,
+            "server_name": "PulseAudio",
+            "default_sink": "sink",
+            "sinks": [],
+            "cards": [],
+            "errors": [],
+            "notes": [],
+        }
+    )
+    monkeypatch.setattr(cli, "inspect_audio_session", probe)
+    assert cli.main(["doctor", "--pipewire", "--json"]) == 3
+    report = json.loads(capsys.readouterr().out)
+    assert report["ok"] is False
+    assert report["audio_session"]["available"] is True
+    probe.assert_called_once_with(timeout=3.0)
+
+
+def test_optional_audio_text_report_does_not_change_alsa_result(
+    backend, monkeypatch, capsys
+):
+    monkeypatch.setattr(
+        cli,
+        "inspect_audio_session",
+        Mock(
+            return_value={
+                "available": True,
+                "server_name": "PulseAudio (on PipeWire)",
+                "default_sink": "sink.0",
+                "sinks": [{"name": "sink.0", "state": "RUNNING"}],
+                "cards": [{"name": "card.0"}],
+                "errors": [],
+                "notes": ["Solo consulta"],
+            }
+        ),
+    )
+    assert cli.main(["doctor", "--pipewire"]) == 0
+    output = capsys.readouterr().out
+    assert "PulseAudio (on PipeWire)" in output
+    assert "Salida predeterminada: sink.0" in output
+    assert "card.0" in output
+    assert "Solo consulta" in output
+
+
 def test_doctor_reports_scope_and_selected_state(backend, capsys):
     assert cli.main(["doctor", "--json"]) == 0
 
@@ -332,7 +430,7 @@ def test_no_arguments_displays_main_help_without_alsa(backend, capsys):
         ),
         (
             ["doctor", "--help"],
-            ("--json", "--card", "--timeout", "PipeWire", "EJEMPLOS"),
+            ("--json", "--card", "--timeout", "--pipewire", "EJEMPLOS"),
         ),
         (
             ["switch", "--help"],
