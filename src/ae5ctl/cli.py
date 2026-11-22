@@ -159,7 +159,7 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl switch speakers --card Creative --json\n"
             "  ae5ctl switch speakers --dry-run --json\n\n"
             "--dry-run muestra el cset previsto SIN ejecutarlo.\n"
-            "Lee el selector, cambia su índice y comprueba el resultado.\n
+            "Lee el selector, cambia su índice y comprueba el resultado.\n"
             "No modifica volumen, DSP ni perfiles PipeWire.",
         ),
         "toggle": (
