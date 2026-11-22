@@ -36,7 +36,7 @@ el procedimiento de capturas posterior solo se activará si reaparece el fallo.
 | 00 · Base | Preservar el original, documentar el alcance, preparar herramientas, tests y CI. | Las pruebas se ejecutan sin GTK ni hardware; el original permanece intacto y los defectos conocidos quedan explícitos. |
 | 01 · Lectura ALSA y diagnóstico | Separar la lectura del estado de la interfaz, interpretar enumerados, seleccionar la tarjeta sin ambigüedad y ofrecer una CLI mínima de consulta. | Tests de controles, errores y tarjeta ausente; contraste temprano con salidas reales de la AE-5. |
 | 02 · Suspensión (condicional) | Investigar únicamente si vuelve a reproducirse tras la actualización de Ubuntu. | Capturas comparables antes del fallo, durante él y tras recuperarlo; no introducir hooks especulativos. |
-| 03 · Conmutación y perfiles | Implementar `switch` y `toggle`, acotar comandos a la tarjeta seleccionada y comparar los perfiles existentes antes de decidir el modo predeterminado. | Errores y tiempos límite controlados, verificación posterior de la selección y pruebas con hardware sin alterar otras tarjetas. |
+| 03 · Conmutación y perfiles | Conmutación ALSA directa implementada en PR #4; comparar perfiles originales y validar en hardware físico. | Confirmar efectos del selector real y preservar DSP, ganancia y volumen; pruebas reales sin alterar otras tarjetas. |
 | 04 · Bandeja | Conectar la interfaz al motor, adaptar el indicador a Ayatana y evitar bloqueos de la sesión gráfica. | Comprobación gráfica, errores visibles y actualización de estado coherente con la CLI. |
 | 05 · Instalación y validación | Documentar instalación, uso y recuperación; añadir distribución y arranque automático cuando el flujo sea fiable. | Comprobación en Ubuntu con auriculares, altavoces y varios ciclos de suspensión; límites conocidos documentados antes de publicar. |
 
@@ -68,6 +68,16 @@ restricciones de solo lectura y sugerencias en errores de texto. El formato JSON
 y sus códigos de salida permanecen estables; las pruebas verifican el contenido
 de la ayuda sin acceder a ALSA. Tras esta mejora, la siguiente prioridad funcional
 es implementar la conmutación de salidas, con validación en hardware.
+
+## Avance en conmutación (PR #4)
+
+`switch headphones`, `switch speakers` y `toggle` utilizan el selector ALSA
+real, sin índice fijo, con `cset` acotado a la tarjeta seleccionada y lectura
+posterior de confirmación. Se evitan escrituras cuando la salida ya está
+seleccionada; los comandos no restauran perfiles completos ni tocan PipeWire.
+Las pruebas usan hardware simulado. Falta contrastar en la AE-5 real que los
+perfiles originales no incluyeran DSP, ganancia o volumen necesarios antes de
+retirar el script gráfico y declarar la conmutación validada.
 
 ## Estado de la fase 01
 
