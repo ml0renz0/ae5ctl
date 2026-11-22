@@ -1,7 +1,9 @@
 # Paquetes .deb y firma OpenSSL
 
 El paquete contiene la CLI de lectura y conmutación del selector ALSA y el
-subcomando opcional `tray`. No instala las dependencias GTK automáticamente ni
+subcomando opcional `tray` y el comparador `profiles diff`. Este último usa
+solo Python estándar y lee archivos del usuario; no requiere ALSA conectada.
+No instala las dependencias GTK automáticamente ni
 incluye perfiles de audio, servicios, reglas de suspensión o reparación automática.
 `doctor --pipewire` necesita `pactl` (`pulseaudio-utils`) solo cuando se solicita;
 ambos conjuntos de dependencias opcionales se indican mediante `Suggests`.
