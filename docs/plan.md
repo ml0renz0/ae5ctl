@@ -237,3 +237,15 @@ una respuesta de otro control aunque indique la salida solicitada. Esto reduce
 las ventanas de carrera, pero no proporciona atomicidad ALSA entre la segunda
 lectura y `cset`. Hay pruebas con cambios concurrentes simulados y sigue
 pendiente comprobar el hardware AE-5 real.
+
+## Recopilación de evidencia en un solo diagnóstico (PR #4)
+
+`ae5ctl doctor --profiles --json` añade la comparación de los dos archivos
+`.state` originales al informe ALSA; puede combinarse con `--pipewire`.
+Ninguna de las dos opciones escribe en ALSA ni restaura estados. Si falta un
+archivo, `profiles.ok=false` y `profiles.error` explican el problema sin
+alterar el código de salida ALSA. La ausencia de `--profiles` conserva el
+contrato JSON previo. El informe combinado permite revisar con el usuario la
+identidad de la tarjeta, el selector real y las diferencias de volumen/DSP
+antes de retirar el script original. Una lectura correcta no valida el sonido
+físico; la prueba en Ubuntu sigue pendiente.

@@ -272,3 +272,97 @@ def test_compare_identical_snapshots_avoids_false_safety_claims(state_files):
     report = compare_profiles(hp, spk)
     assert report["summary"]["different_controls"] == 0
     assert any("no se ha probado" in warning for warning in report["warnings"])
+
+
+@pytest.fixture
+def doctor_backend(monkeypatch):
+    from ae5ctl.alsa import Card, EnumControl, Status
+
+    card = Card(7, "Creative", "Sound BlasterX AE-5")
+    status = Status(
+        card,
+        EnumControl(43, "Output Select", {0: "Headphone", 1: "Speakers"}, (0,)),
+        "headphones",
+    )
+    backend = Mock()
+    backend.cards.return_value = [card]
+    backend.status.return_value = status
+    monkeypatch.setattr(cli, "AlsaBackend", Mock(return_value=backend))
+    return backend
+
+
+def test_doctor_opt_in_profiles_joins_read_only_evidence(
+    monkeypatch, doctor_backend, state_files, capsys
+):
+    hp, spk = state_files(snapshot(volume="35"), snapshot(route="Speakers", volume="80"))
+    monkeypatch.setattr(cli, "HEADPHONES_FILE", hp)
+    monkeypatch.setattr(cli, "SPEAKERS_FILE", spk)
+    monkeypatch.setattr(
+        subprocess, "run", Mock(side_effect=AssertionError("unexpected subprocess"))
+    )
+
+    assert cli.main(["doctor", "--profiles", "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["ok"] is True
+    assert report["status"]["output"] == "headphones"
+    assert report["profiles"]["ok"] is True
+    assert report["profiles"]["comparison"]["summary"]["different_controls"] == 2
+    assert "audio_session" not in report
+    doctor_backend.status.assert_called_once_with(card=None, numid=None)
+
+
+def test_doctor_without_profiles_keeps_json_unchanged(
+    monkeypatch, doctor_backend, capsys
+):
+    monkeypatch.setattr(
+        cli,
+        "compare_profiles",
+        Mock(side_effect=AssertionError("profile comparison was not requested")),
+    )
+    assert cli.main(["doctor", "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert "profiles" not in report
+    assert report["status"]["output"] == "headphones"
+
+
+def test_doctor_missing_optional_profiles_does_not_fail_alsa(
+    monkeypatch, doctor_backend, tmp_path, capsys
+):
+    monkeypatch.setattr(cli, "HEADPHONES_FILE", tmp_path / "missing-hp.state")
+    monkeypatch.setattr(cli, "SPEAKERS_FILE", tmp_path / "missing-spk.state")
+    assert cli.main(["doctor", "--profiles", "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["ok"] is True
+    assert report["profiles"]["ok"] is False
+    assert report["profiles"]["error"]["code"] == "file_missing"
+    assert report["errors"] == []
+
+
+def test_doctor_profiles_still_collected_when_alsa_fails(
+    monkeypatch, doctor_backend, state_files, capsys
+):
+    from ae5ctl.alsa import AlsaError
+
+    hp, spk = state_files(snapshot(), snapshot(route="Speakers"))
+    monkeypatch.setattr(cli, "HEADPHONES_FILE", hp)
+    monkeypatch.setattr(cli, "SPEAKERS_FILE", spk)
+    doctor_backend.status.side_effect = AlsaError("no_control", "sin selector")
+    assert cli.main(["doctor", "--profiles", "--json"]) == 3
+    report = json.loads(capsys.readouterr().out)
+    assert report["ok"] is False
+    assert report["errors"][0]["code"] == "no_control"
+    assert report["profiles"]["ok"] is True
+    assert report["profiles"]["comparison"]["summary"]["different_controls"] == 1
+
+
+def test_doctor_profiles_text_shows_comparison_and_notes(
+    monkeypatch, doctor_backend, state_files, capsys
+):
+    hp, spk = state_files(snapshot(), snapshot(route="Speakers"))
+    monkeypatch.setattr(cli, "HEADPHONES_FILE", hp)
+    monkeypatch.setattr(cli, "SPEAKERS_FILE", spk)
+    assert cli.main(["doctor", "--profiles"]) == 0
+    text = capsys.readouterr().out
+    assert "Diagnóstico ALSA: lectura correcta" in text
+    assert "Comparación de perfiles ALSA guardados" in text
+    assert "Output Select" in text

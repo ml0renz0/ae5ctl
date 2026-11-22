@@ -50,6 +50,8 @@ ae5ctl switch speakers
 ae5ctl toggle
 ae5ctl doctor --json
 ae5ctl doctor --pipewire --json  # Inspección opcional, solo lectura
+ae5ctl doctor --profiles --json  # Diagnóstico + perfiles originales
+ae5ctl doctor --pipewire --profiles --json  # Informe combinado, solo lectura
 ae5ctl profiles diff --json       # Comparación sin escribir en ALSA
 ```
 
@@ -117,6 +119,16 @@ de `alsactl store` y no superar 2 MiB cada uno.
 **No restaure perfiles completos para probar esta función.** Antes de
 sustituir el script original será necesario revisar el resultado con los
 archivos reales del equipo. Las pruebas automáticas utilizan perfiles sintéticos.
+
+Para reunir en un único JSON el selector ALSA y el contraste con los dos
+archivos originales, usa `ae5ctl doctor --profiles --json`. Para añadir el
+diagnóstico del servidor de audio, usa `--pipewire`. Ambas opciones son
+estrictamente de solo lectura. La sección `profiles.ok` confirma únicamente que
+se han comparado los archivos; **no** que los perfiles sean equivalentes ni
+que se haya probado el hardware. Si falta un fichero, se muestra el error
+`profiles.error`, sin alterar el código de salida del diagnóstico ALSA.
+Sin `--profiles`, el JSON anterior no cambia. El informe puede incluir
+identificadores de dispositivos: revísalo antes de publicarlo.
 
 ## Indicador de bandeja (opcional)
 
@@ -256,12 +268,14 @@ ae5ctl doctor --json
 sudo apt remove ae5ctl
 ```
 
-Trabajamos con TBD: ramas cortas y PR hacia `main`. El
-[flujo CI/CD](docs/deb-packages.md#cicd-automático) valida las PR y, al fusionarlas
-en `main`, genera, prueba, firma y publica automáticamente el `.deb` en
-[Releases](https://github.com/ml0renz0/ae5ctl/releases). No requiere crear etiquetas
-ni ejecutar workflows manualmente. La firma es separada: APT no verifica los
-archivos `.sig` de OpenSSL automáticamente.
+Trabajamos mediante PR hacia `main`. El
+[flujo CI/CD](docs/deb-packages.md#cicd-debian-bajo-demanda) valida el código sin
+generar paquetes en las PR ordinarias ni al fusionar. Solo `build-deb` en una
+PR ejecuta la prueba opcional de empaquetado; **únicamente una etiqueta Git
+de versión `v<version>` aplicada a un commit de `main`** construye, prueba,
+firma y publica el `.deb` en
+[Releases](https://github.com/ml0renz0/ae5ctl/releases). La firma es separada:
+APT no verifica los archivos `.sig` de OpenSSL automáticamente.
 
 ## Limitaciones del script original
 
@@ -290,7 +304,7 @@ La modalidad predeterminada sigue pendiente de esa evidencia.
 
 Los cambios se organizan por fases verificables. Las pruebas sin hardware y las
 comprobaciones manuales con la AE-5 se documentarán por separado. Se puede instalar
-la CLI como paquete Python o generar un `.deb` de desarrollo. CI/CD publica las
-compilaciones verificadas de `main` como prereleases. El arranque automático y la
+la CLI como paquete Python o generar un `.deb` de desarrollo. CI/CD publica
+las versiones etiquetadas y verificadas de `main` como prereleases. El arranque automático y la
 validación funcional con hardware siguen pendientes, al igual que la elección
 de licencia del proyecto.

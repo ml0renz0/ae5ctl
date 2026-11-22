@@ -111,6 +111,7 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl tray                  Indicador de bandeja (GTK/Ayatana)\n"
             "  ae5ctl doctor --json        Diagnóstico ALSA estructurado\n"
             "  ae5ctl doctor --pipewire    Inspección del servidor de audio\n"
+            "  ae5ctl doctor --profiles    Incluye los perfiles ALSA guardados\n"
             "  ae5ctl profiles diff        Compara perfiles alsactl guardados\n\n"
             "La conmutación NO restaura perfiles de volumen, ganancia ni DSP.\n"
             "La lectura ALSA no garantiza que el audio sea audible.\n\n"
@@ -152,9 +153,11 @@ def parser() -> argparse.ArgumentParser:
             "EJEMPLOS\n"
             "  ae5ctl doctor\n"
             "  ae5ctl doctor --card Creative --json\n"
-            "  ae5ctl doctor --pipewire --json\n\n"
+            "  ae5ctl doctor --pipewire --json\n"
+            "  ae5ctl doctor --pipewire --profiles --json\n\n"
             "--pipewire usa pactl (PipeWire o PulseAudio).\n"
-            "Es una lectura opcional; no modifica perfiles ni rutas.",
+            "--profiles compara los dos .state originales, si existen.\n"
+            "Son lecturas opcionales; no modifican perfiles ni rutas.",
         ),
         "switch": (
             "Selecciona auriculares o altavoces modificando solo el control ALSA.",
@@ -266,6 +269,11 @@ def parser() -> argparse.ArgumentParser:
                 "--pipewire",
                 action="store_true",
                 help="consultar servidor y salidas mediante pactl (solo lectura)",
+            )
+            command.add_argument(
+                "--profiles",
+                action="store_true",
+                help="incluir la comparación de los .state originales (solo lectura)",
             )
         if name in {"switch", "toggle"}:
             command.add_argument(
@@ -443,6 +451,16 @@ def doctor(backend: AlsaBackend, args: argparse.Namespace) -> int:
         result = exit_code(error)
     if args.pipewire:
         report["audio_session"] = inspect_audio_session(timeout=args.timeout)
+    if args.profiles:
+        try:
+            comparison = compare_profiles(HEADPHONES_FILE, SPEAKERS_FILE)
+        except ProfileError as error:
+            report["profiles"] = {
+                "ok": False,
+                "error": {"code": error.code, "message": str(error)},
+            }
+        else:
+            report["profiles"] = {"ok": True, "comparison": comparison}
     if args.json:
         print_json(report)
     else:
@@ -473,6 +491,13 @@ def doctor(backend: AlsaBackend, args: argparse.Namespace) -> int:
                 print(f"Aviso audio [{issue['code']}]: {issue['message']}")
             for note in session["notes"]:
                 print(note)
+        if args.profiles:
+            profiles = report["profiles"]
+            if profiles["ok"]:
+                print_profile_diff(profiles["comparison"])
+            else:
+                error = profiles["error"]
+                print(f"Aviso perfiles [{error['code']}]: {error['message']}")
         for note in report["notes"]:
             print(note)
     return result
