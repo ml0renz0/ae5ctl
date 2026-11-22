@@ -26,6 +26,8 @@ SELECTION_ERRORS = {
     "unknown_output",
     "ambiguous_output",
     "card_changed",
+    "control_changed",
+    "state_changed",
 }
 DIAGNOSTIC_NOTES = [
     "El comando doctor es de solo lectura; no modifica controles ni perfiles.",
@@ -62,6 +64,8 @@ ERROR_HINTS = {
         "El resultado es incierto: ejecute ae5ctl status antes de reintentar."
     ),
     "card_changed": "La tarjeta cambió. Compruebe ae5ctl cards y consulte de nuevo.",
+    "control_changed": "El selector se reconfiguró. Consulte ae5ctl status y reintente.",
+    "state_changed": "Otro cliente modificó la salida. Consulte ae5ctl status.",
 }
 
 

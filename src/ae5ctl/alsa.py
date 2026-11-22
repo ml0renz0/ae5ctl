@@ -367,6 +367,24 @@ class AlsaBackend:
                 "La identidad de la tarjeta ALSA cambió antes de escribir. "
                 "Ejecute ae5ctl cards y repita la consulta.",
             )
+        # Re-read immediately before writing: another client or a driver reset
+        # may have changed the selected value or reassigned this numid.
+        current = self._control(before.card, before.control.numid)
+        if (
+            current.name != before.control.name
+            or current.items != before.control.items
+        ):
+            raise AlsaError(
+                "control_changed",
+                "El control ALSA cambió después de la lectura inicial. "
+                "Consulte ae5ctl status y vuelva a intentarlo.",
+            )
+        if current.values != before.control.values:
+            raise AlsaError(
+                "state_changed",
+                "La salida ALSA cambió durante la operación. "
+                "No se ha escrito ningún cambio; consulte ae5ctl status.",
+            )
         self._run(
             before.card,
             "cset",
@@ -382,7 +400,9 @@ class AlsaBackend:
                 "Consulte ae5ctl status antes de volver a intentarlo.",
             ) from exc
         if (
-            len(control.values) != 1
+            control.name != before.control.name
+            or control.items != before.control.items
+            or len(control.values) != 1
             or _output(control.items.get(control.values[0], "")) != target
         ):
             raise AlsaError(

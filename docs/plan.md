@@ -225,3 +225,15 @@ que el commit pertenece a `main`, ejecuta las pruebas de paquete, construye
 una sola vez, realiza smoke tests Ubuntu 22.04/24.04, firma y publica el `.deb`
 ya probado. La PR con `build-deb` sigue usando su job opcional independiente.
 No hay artefactos intermedios de Actions ni compilaciones en PR sin etiqueta.
+
+## Guardia contra estado obsoleto del selector (PR #4)
+
+La conmutación vuelve a leer el control justo antes de escribir y comprueba
+que el nombre, los índices/opciones enumeradas y el valor seleccionado coinciden
+con la lectura original. Si otro cliente cambia la salida, devuelve
+`state_changed` sin escribir; si cambia el control enumerado, devuelve
+`control_changed` sin escribir. La verificación posterior tampoco acepta
+una respuesta de otro control aunque indique la salida solicitada. Esto reduce
+las ventanas de carrera, pero no proporciona atomicidad ALSA entre la segunda
+lectura y `cset`. Hay pruebas con cambios concurrentes simulados y sigue
+pendiente comprobar el hardware AE-5 real.

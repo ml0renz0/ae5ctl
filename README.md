@@ -58,7 +58,9 @@ selector actual, muestran el `numid` y la opción enumerada que usarían y
 construyen el comando `amixer cset` previsto, **sin ejecutarlo**. No garantizan
 que, entre la previsualización y un cambio posterior, la tarjeta o sus
 controles sigan siendo iguales. El cambio efectivo vuelve a comprobar la
-identidad de la tarjeta y verifica el selector tras escribir.
+identidad de la tarjeta, su enumerado y el valor seleccionado antes de
+escribir, y verifica el selector tras escribir. Si otro cliente cambia la salida
+durante la operación, se cancela sin escribir; la comprobación no es atómica.
 
 **Advertencia:** `switch` y `toggle` escriben únicamente el control enumerado
 de la tarjeta ALSA seleccionada. No restauran los perfiles
