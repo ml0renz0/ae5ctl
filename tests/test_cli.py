@@ -302,6 +302,7 @@ def test_doctor_integration_preserves_amixer_failure(real_backend, capsys):
     assert real_backend.call_args.args[0] == command
     assert real_backend.call_args.kwargs["shell"] is False
 
+
 def test_no_arguments_displays_main_help_without_alsa(backend, capsys):
     _, factory = backend
     assert cli.main([]) == 0
@@ -326,7 +327,9 @@ def test_no_arguments_displays_main_help_without_alsa(backend, capsys):
         ),
     ],
 )
-def test_help_explains_usage_without_accessing_hardware(backend, capsys, argv, required):
+def test_help_explains_usage_without_accessing_hardware(
+    backend, capsys, argv, required
+):
     _, factory = backend
     with pytest.raises(SystemExit) as error:
         cli.main(argv)
@@ -339,6 +342,7 @@ def test_help_explains_usage_without_accessing_hardware(backend, capsys, argv, r
 
 def test_version_is_available_without_alsa(backend, capsys):
     from ae5ctl import __version__
+
     _, factory = backend
     with pytest.raises(SystemExit) as error:
         cli.main(["--version"])
@@ -351,6 +355,7 @@ def test_version_tracks_pyproject():
     from pathlib import Path
 
     from ae5ctl import __version__
+
     project = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
         encoding="utf-8"
     )
