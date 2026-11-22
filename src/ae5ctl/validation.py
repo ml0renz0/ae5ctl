@@ -100,7 +100,9 @@ def run_validation(
                                 ask, f"¿Se oye audio por {plan.target}? [s/N] "
                             )
                             if not alternate_audible:
-                                failure = "No se confirmó audio en la salida alternativa."
+                                failure = (
+                                    "No se confirmó audio en la salida alternativa."
+                                )
                 except AlsaError as error:
                     if error.code in NO_WRITE_ERRORS:
                         # No cset: do not undo an external selection.

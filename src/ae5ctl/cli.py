@@ -556,9 +556,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "doctor":
         return doctor(backend, args)
     try:
-        if args.command == "wizard" or (
-            args.command == "validate" and args.apply
-        ):
+        if args.command == "wizard" or (args.command == "validate" and args.apply):
             from ae5ctl.wizard import run_wizard
 
             return run_wizard(backend, card=args.card, numid=args.numid)

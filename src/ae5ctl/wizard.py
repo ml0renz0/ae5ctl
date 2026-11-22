@@ -95,7 +95,9 @@ def discover_sinks(
         label = entry.get("description") or props.get("device.description") or name
         sinks.append(Sink(name, str(label), card_index))
     if not sinks:
-        raise ProbeError("No se han encontrado salidas de audio de PipeWire/PulseAudio.")
+        raise ProbeError(
+            "No se han encontrado salidas de audio de PipeWire/PulseAudio."
+        )
     return sinks
 
 
@@ -142,7 +144,9 @@ def make_tone(destination: Path) -> None:
         output.setframerate(rate)
         for frame in range(frames):
             envelope = min(1.0, frame / fade, (frames - 1 - frame) / fade)
-            value = int(32767 * 0.09 * envelope * math.sin(2 * math.pi * 440 * frame / rate))
+            value = int(
+                32767 * 0.09 * envelope * math.sin(2 * math.pi * 440 * frame / rate)
+            )
             output.writeframesraw(struct.pack("<h", value))
 
 

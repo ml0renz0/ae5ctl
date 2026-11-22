@@ -74,11 +74,17 @@ def test_fully_guided_wizard_plays_three_tones_and_restores_original():
 def test_wizard_no_heard_audio_does_not_write():
     backend = FakeBackend()
     runner, commands = fake_audio()
-    assert run_wizard(
-        backend, ask=answers("no"), runner=runner, profiles=lambda *_: {
-            "summary": {"different_controls": 0, "possible_non_routing_changes": 0}
-        }
-    ) == 5
+    assert (
+        run_wizard(
+            backend,
+            ask=answers("no"),
+            runner=runner,
+            profiles=lambda *_: {
+                "summary": {"different_controls": 0, "possible_non_routing_changes": 0}
+            },
+        )
+        == 5
+    )
     assert backend.writes == []
     assert sum(c[0] == "paplay" for c in commands) == 1
 
@@ -129,14 +135,17 @@ def test_wizard_playback_failure_after_switch_restores_card():
                 return subprocess.CompletedProcess(cmd, 1, "", "device lost")
         return runner(cmd, **kwargs)
 
-    assert run_wizard(
-        backend,
-        ask=answers("s", "CAMBIAR"),
-        runner=flaky,
-        profiles=lambda *_: {
-            "summary": {"different_controls": 0, "possible_non_routing_changes": 0}
-        },
-    ) == 5
+    assert (
+        run_wizard(
+            backend,
+            ask=answers("s", "CAMBIAR"),
+            runner=flaky,
+            profiles=lambda *_: {
+                "summary": {"different_controls": 0, "possible_non_routing_changes": 0}
+            },
+        )
+        == 5
+    )
     assert backend.writes == ["speakers", "headphones"]
 
 
@@ -154,8 +163,6 @@ def test_wizard_interruption_before_changing_exits_cleanly():
 def test_wizard_no_audio_writes_until_selected_sink_confirmed():
     backend = FakeBackend()
     runner, commands = fake_audio(match=False)
-    assert run_wizard(
-        backend, ask=answers("0"), runner=runner
-    ) == 5
+    assert run_wizard(backend, ask=answers("0"), runner=runner) == 5
     assert backend.writes == []
     assert not any(cmd[0] == "paplay" for cmd in commands)
