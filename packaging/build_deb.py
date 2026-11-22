@@ -119,7 +119,7 @@ def stage_package(
     write_file(docs / "copyright", (templates / "copyright").read_bytes())
     changelog = (
         f"{PACKAGE} ({version}) unstable; urgency=low\n\n"
-        "  * Development package of the read-only ALSA diagnostic CLI.\n"
+        "  * Development package of the ALSA switching and diagnostic CLI.\n"
         "  * Upstream license selection and physical AE-5 validation remain pending.\n\n"
         f" -- {MAINTAINER}  {formatdate(epoch, localtime=False)}\n"
     )
@@ -149,7 +149,7 @@ def stage_package(
         f"Homepage: {HOMEPAGE}\n"
         f"Description: {project['description']}\n"
         " Lists ALSA cards and reads enumerated headphone/speaker selectors.\n"
-        " Includes read-only diagnostics; no desktop or audio configuration changes.\n"
+        " Includes read-only diagnostics and verified ALSA output switching.\n"
         " This is a development build with hardware validation still pending.\n"
     )
     write_file(stage / "DEBIAN/control", control.encode("utf-8"))
