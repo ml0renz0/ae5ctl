@@ -220,7 +220,6 @@ def test_help_does_not_instantiate_backend(backend, capsys, argv):
 @pytest.mark.parametrize(
     "argv",
     [
-        [],
         ["switch", "headphones"],
         ["status", "--numid", "0"],
         ["status", "--numid", "-1"],
@@ -302,3 +301,77 @@ def test_doctor_integration_preserves_amixer_failure(real_backend, capsys):
     real_backend.assert_called_once()
     assert real_backend.call_args.args[0] == command
     assert real_backend.call_args.kwargs["shell"] is False
+
+def test_no_arguments_displays_main_help_without_alsa(backend, capsys):
+    _, factory = backend
+    assert cli.main([]) == 0
+    out = capsys.readouterr().out
+    for text in ("COMANDO", "EJEMPLOS", "CÓDIGOS DE SALIDA", "--version"):
+        assert text in out
+    factory.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "argv, required",
+    [
+        (["--help"], ("cards", "status", "doctor", "EJEMPLOS", "--version")),
+        (["cards", "--help"], ("--json", "EJEMPLOS", "ae5ctl cards")),
+        (
+            ["status", "--help"],
+            ("--card", "--numid", "--timeout", "EJEMPLOS", "ae5ctl cards"),
+        ),
+        (
+            ["doctor", "--help"],
+            ("--json", "--card", "--timeout", "PipeWire", "EJEMPLOS"),
+        ),
+    ],
+)
+def test_help_explains_usage_without_accessing_hardware(backend, capsys, argv, required):
+    _, factory = backend
+    with pytest.raises(SystemExit) as error:
+        cli.main(argv)
+    assert error.value.code == 0
+    output = capsys.readouterr().out
+    for text in required:
+        assert text in output
+    factory.assert_not_called()
+
+
+def test_version_is_available_without_alsa(backend, capsys):
+    from ae5ctl import __version__
+    _, factory = backend
+    with pytest.raises(SystemExit) as error:
+        cli.main(["--version"])
+    assert error.value.code == 0
+    assert capsys.readouterr().out.strip() == f"ae5ctl {__version__}"
+    factory.assert_not_called()
+
+
+def test_version_tracks_pyproject():
+    from pathlib import Path
+    from ae5ctl import __version__
+    project = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
+        encoding="utf-8"
+    )
+    assert f'version = "{__version__}"' in project
+
+
+def test_human_readable_error_has_actionable_hint(backend, capsys):
+    instance, _ = backend
+    instance.status.side_effect = AlsaError("card_not_found", "Tarjeta no detectada")
+    assert cli.main(["status"]) == 3
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Sugerencia:" in captured.err
+    assert "ae5ctl cards" in captured.err
+
+
+def test_json_error_does_not_include_human_hint(backend, capsys):
+    instance, _ = backend
+    instance.status.side_effect = AlsaError("card_not_found", "Tarjeta no detectada")
+    assert cli.main(["status", "--json"]) == 3
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert json.loads(captured.out) == {
+        "error": {"code": "card_not_found", "message": "Tarjeta no detectada"}
+    }
