@@ -349,6 +349,7 @@ def test_version_is_available_without_alsa(backend, capsys):
 
 def test_version_tracks_pyproject():
     from pathlib import Path
+
     from ae5ctl import __version__
     project = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
         encoding="utf-8"
