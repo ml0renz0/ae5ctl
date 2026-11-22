@@ -10,8 +10,7 @@ from ae5ctl import cli
 from ae5ctl.alsa import AlsaBackend
 
 CARDS = (
-    " 2 [USB]: USB-Audio - USB Audio\n"
-    " 7 [Creative]: HDA-Intel - Sound BlasterX AE-5\n"
+    " 2 [USB]: USB-Audio - USB Audio\n 7 [Creative]: HDA-Intel - Sound BlasterX AE-5\n"
 )
 CONTROLS = (
     "numid=9,iface=MIXER,name='Master Playback Volume'\n"
