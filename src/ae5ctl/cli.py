@@ -107,6 +107,8 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl switch headphones    Selecciona auriculares\n"
             "  ae5ctl switch speakers      Selecciona altavoces\n"
             "  ae5ctl toggle               Alterna ambas salidas\n"
+            "  ae5ctl validate             Inspección guiada sin modificar ALSA\n"
+            "  ae5ctl validate --apply     Prueba física interactiva con restauración\n"
             "  ae5ctl switch speakers --dry-run  Previsualiza sin cambiar audio\n"
             "  ae5ctl tray                  Indicador de bandeja (GTK/Ayatana)\n"
             "  ae5ctl doctor --json        Diagnóstico ALSA estructurado\n"
@@ -118,7 +120,8 @@ def parser() -> argparse.ArgumentParser:
             "AYUDA DETALLADA\n"
             "  ae5ctl <comando> --help\n\n"
             "CÓDIGOS DE SALIDA\n"
-            "  0 correcto · 2 argumentos · 3 selección · 4 error ALSA\n\n"
+            "  0 correcto · 2 argumentos · 3 selección · 4 error ALSA\n"
+            "  5 validación no completada · 130 interrumpida\n\n"
             "Más información: https://github.com/ml0renz0/ae5ctl"
         ),
     )
@@ -178,6 +181,17 @@ def parser() -> argparse.ArgumentParser:
             "--dry-run calcula la próxima salida sin modificar ALSA.\n"
             "No se basa en un archivo de último estado ni restaura perfiles.",
         ),
+        "validate": (
+            "Inspecciona el selector y guía una prueba auditiva opcional.",
+            "EJEMPLOS\n"
+            "  ae5ctl validate\n"
+            "  ae5ctl validate --card Creative\n"
+            "  ae5ctl validate --apply --card Creative\n\n"
+            "Sin --apply: solo lectura; no reproduce sonido.\n"
+            "Con --apply: requiere interacción y autorización 'CAMBIAR';\n"
+            "cambia solo el selector ALSA e intenta restaurarlo al terminar.\n"
+            "No certifica DSP, volumen, PipeWire ni la bandeja GNOME.",
+        ),
         "profiles": (
             "Inspecciona los perfiles ALSA guardados; nunca ejecuta alsactl.",
             "EJEMPLOS\n"
@@ -203,6 +217,7 @@ def parser() -> argparse.ArgumentParser:
         ("doctor", "diagnosticar la lectura ALSA (sin reparar audio)"),
         ("switch", "seleccionar auriculares o altavoces"),
         ("toggle", "alternar la salida ALSA"),
+        ("validate", "guiar una prueba física segura de las salidas"),
         ("tray", "mostrar el indicador gráfico opcional"),
         ("profiles", "comparar perfiles ALSA guardados (solo lectura)"),
     ]:
@@ -280,6 +295,12 @@ def parser() -> argparse.ArgumentParser:
                 "--dry-run",
                 action="store_true",
                 help="mostrar el cambio y comando ALSA previstos sin escribir",
+            )
+        if name == "validate":
+            command.add_argument(
+                "--apply",
+                action="store_true",
+                help="autorizar prueba interactiva que puede cambiar ALSA",
             )
         if name == "switch":
             command.add_argument(
@@ -524,6 +545,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "doctor":
         return doctor(backend, args)
     try:
+        if args.command == "validate":
+            from ae5ctl.validation import run_validation
+
+            return run_validation(
+                backend, card=args.card, numid=args.numid, apply=args.apply
+            )
         if args.command == "cards":
             cards = [asdict(card) for card in backend.cards()]
             if args.json:

@@ -48,6 +48,8 @@ ae5ctl toggle --dry-run
 ae5ctl switch headphones
 ae5ctl switch speakers
 ae5ctl toggle
+ae5ctl validate                      # No escribe; diagnóstico previo
+ae5ctl validate --apply              # Prueba auditiva guiada y reversible
 ae5ctl doctor --json
 ae5ctl doctor --pipewire --json  # Inspección opcional, solo lectura
 ae5ctl doctor --profiles --json  # Diagnóstico + perfiles originales
@@ -129,6 +131,27 @@ que se haya probado el hardware. Si falta un fichero, se muestra el error
 `profiles.error`, sin alterar el código de salida del diagnóstico ALSA.
 Sin `--profiles`, el JSON anterior no cambia. El informe puede incluir
 identificadores de dispositivos: revísalo antes de publicarlo.
+
+## Validación física guiada (opcional)
+
+La guía [Validación en Ubuntu](docs/validation-ubuntu.md) separa comprobaciones
+ALSA, escucha real y revisión visual del indicador GNOME. Antes de ejecutar
+cambios, revisa `ae5ctl doctor --profiles --pipewire --json` y confirma que
+las diferencias con el script original no requieren restaurar volumen o DSP.
+
+```bash
+ae5ctl validate --card ID_ALSA            # Solo lectura, sin prompts
+ae5ctl validate --apply --card ID_ALSA    # Interactiva, solicita CAMBIAR
+```
+
+`--apply` nunca reproduce audio automáticamente: debes poner una muestra
+de audio tú mismo, confirmar si se oye en ambas salidas y revisar el retorno
+a la selección inicial. Solo cambia el selector ALSA; intenta restaurarlo
+también si interrumpes la prueba, pero **no garantiza recuperación** ante
+desconexión de la tarjeta, fallo de permisos o cambio de controles.
+Un resultado correcto valida únicamente el recorrido de la CLI y la
+confirmación auditiva manual, no DSP, PipeWire ni la bandeja. Los códigos
+`5` y `130` indican validación incompleta e interrupción, respectivamente.
 
 ## Indicador de bandeja (opcional)
 
@@ -216,6 +239,8 @@ estándar; en modo texto, los errores se escriben en la salida de errores.
 | 2 | Argumentos inválidos. |
 | 3 | Tarjeta o control ausente o ambiguo, o salida desconocida. |
 | 4 | Dependencia ausente, comando fallido, permiso, tiempo límite o respuesta inválida. |
+| 5 | Validación interactiva incompleta o no satisfactoria. |
+| 130 | Validación interactiva interrumpida. |
 
 `cards`, `status` y `doctor` son de solo lectura; `switch` y `toggle` sí modifican
 el selector de salida ALSA y verifican que queda seleccionado. Una selección

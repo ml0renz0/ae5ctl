@@ -249,3 +249,14 @@ contrato JSON previo. El informe combinado permite revisar con el usuario la
 identidad de la tarjeta, el selector real y las diferencias de volumen/DSP
 antes de retirar el script original. Una lectura correcta no valida el sonido
 físico; la prueba en Ubuntu sigue pendiente.
+
+## Fase 05 · validación física guiada (PR #4)
+
+`ae5ctl validate` inspecciona la selección y el cambio previsto sin escribir.
+`ae5ctl validate --apply` requiere confirmar audio inicial y teclear
+`CAMBIAR`; alterna mediante el motor ALSA, solicita confirmación auditiva
+humana y trata de restaurar la salida inicial incluso si hay interrupción.
+Una restauración fallida se informa explícitamente; no se aplican perfiles,
+volúmenes ni reparación automática. La comprobación del indicador GTK/Ayatana
+se documenta por separado en `docs/validation-ubuntu.md`. Los tests simulan
+hardware y respuestas del operador; no constituyen validación física.
