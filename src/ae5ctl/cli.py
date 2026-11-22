@@ -5,10 +5,17 @@ import json
 import math
 import sys
 from dataclasses import asdict
+from pathlib import Path
 
 from ae5ctl import __version__
 from ae5ctl.alsa import AlsaBackend, AlsaError, Status, SwitchResult
 from ae5ctl.audio_session import inspect_audio_session
+from ae5ctl.profiles import (
+    HEADPHONES_FILE,
+    SPEAKERS_FILE,
+    ProfileError,
+    compare_profiles,
+)
 
 SELECTION_ERRORS = {
     "no_card",
@@ -96,7 +103,8 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl toggle               Alterna ambas salidas\n"
             "  ae5ctl tray                  Indicador de bandeja (GTK/Ayatana)\n"
             "  ae5ctl doctor --json        Diagnóstico ALSA estructurado\n"
-            "  ae5ctl doctor --pipewire    Inspección del servidor de audio\n\n"
+            "  ae5ctl doctor --pipewire    Inspección del servidor de audio\n"
+            "  ae5ctl profiles diff        Compara perfiles alsactl guardados\n\n"
             "La conmutación NO restaura perfiles de volumen, ganancia ni DSP.\n"
             "La lectura ALSA no garantiza que el audio sea audible.\n\n"
             "AYUDA DETALLADA\n"
@@ -156,6 +164,15 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl toggle --card Creative --json\n\n"
             "No se basa en un archivo de último estado ni restaura perfiles.",
         ),
+        "profiles": (
+            "Inspecciona los perfiles ALSA guardados; nunca ejecuta alsactl.",
+            "EJEMPLOS\n"
+            "  ae5ctl profiles diff\n"
+            "  ae5ctl profiles diff --json\n"
+            "  ae5ctl profiles diff --headphones /tmp/hp.state "
+            "--speakers /tmp/spk.state\n\n"
+            "La comparación es de solo lectura y no necesita hardware.",
+        ),
         "tray": (
             "Muestra un indicador GTK 3/Ayatana conectado al motor ALSA.",
             "EJEMPLOS\n"
@@ -173,6 +190,7 @@ def parser() -> argparse.ArgumentParser:
         ("switch", "seleccionar auriculares o altavoces"),
         ("toggle", "alternar la salida ALSA"),
         ("tray", "mostrar el indicador gráfico opcional"),
+        ("profiles", "comparar perfiles ALSA guardados (solo lectura)"),
     ]:
         description, epilog = details[name]
         command = commands.add_parser(
@@ -182,6 +200,42 @@ def parser() -> argparse.ArgumentParser:
             epilog=epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
+        if name == "profiles":
+            tasks = command.add_subparsers(
+                dest="profile_action", required=True, metavar="ACCIÓN"
+            )
+            compare = tasks.add_parser(
+                "diff",
+                help="comparar los valores guardados sin modificar ALSA",
+                description="Compara dos ficheros alsactl store por nombre e interfaz.",
+                formatter_class=argparse.RawDescriptionHelpFormatter,
+                epilog=(
+                    "EJEMPLOS\n"
+                    "  ae5ctl profiles diff\n"
+                    "  ae5ctl profiles diff --json\n"
+                    "  ae5ctl profiles diff --headphones /tmp/hp.state "
+                    "--speakers /tmp/spk.state\n\n"
+                    "Los valores son guardados; no se comprueba la tarjeta real."
+                ),
+            )
+            compare.add_argument(
+                "--headphones",
+                type=Path,
+                default=HEADPHONES_FILE,
+                metavar="FICHERO",
+                help="perfil de auriculares (predeterminado: ~/.config/ae5-headphones.state)",
+            )
+            compare.add_argument(
+                "--speakers",
+                type=Path,
+                default=SPEAKERS_FILE,
+                metavar="FICHERO",
+                help="perfil de altavoces (predeterminado: ~/.config/ae5-speakers.state)",
+            )
+            compare.add_argument(
+                "--json", action="store_true", help="imprimir JSON para scripts"
+            )
+            continue
         if name != "tray":
             command.add_argument(
                 "--json", action="store_true", help="imprimir JSON para scripts"
@@ -267,6 +321,47 @@ def print_status(value: dict) -> None:
     print("Esta lectura no confirma que se oiga audio.")
 
 
+def print_profile_diff(report: dict) -> None:
+    summary = report["summary"]
+    print("Comparación de perfiles ALSA guardados (solo lectura)")
+    print(f"Auriculares: {report['headphones_file']}")
+    print(f"Altavoces: {report['speakers_file']}")
+    print(
+        f"Controles: {summary['controls_headphones']} / "
+        f"{summary['controls_speakers']}; sin cambios: "
+        f"{summary['unchanged_controls']}; distintos: "
+        f"{summary['different_controls']}"
+    )
+    for diff in report["differences"]:
+        print(f"  [{diff['card']}] {diff['name']} ({diff['category']}):")
+        left = diff["headphones"] or {}
+        right = diff["speakers"] or {}
+        for key in sorted(set(left) | set(right)):
+            before = str(left.get(key, "<ausente>"))[:120]
+            after = str(right.get(key, "<ausente>"))[:120]
+            print(f"    {key}: {before} -> {after}")
+    for warning in report["warnings"]:
+        print(f"AVISO: {warning}")
+    for note in report["notes"]:
+        print(f"Nota: {note}")
+
+
+def profiles_command(args: argparse.Namespace) -> int:
+    try:
+        report = compare_profiles(args.headphones, args.speakers)
+    except ProfileError as error:
+        if args.json:
+            print_json({"error": {"code": error.code, "message": str(error)}})
+        else:
+            print(f"Error [{error.code}]: {error}", file=sys.stderr)
+        return 4
+    if args.json:
+        print_json(report)
+    else:
+        print_profile_diff(report)
+    return 0
+
+
 def print_error(error: AlsaError) -> None:
     print(f"Error [{error.code}]: {error}", file=sys.stderr)
     hint = ERROR_HINTS.get(error.code)
@@ -334,6 +429,8 @@ def main(argv: list[str] | None = None) -> int:
         parser().print_help()
         return 0
     args = parser().parse_args(arguments)
+    if args.command == "profiles":
+        return profiles_command(args)
     if args.command == "tray":
         from ae5ctl.tray import run_tray
 
