@@ -38,6 +38,19 @@ ae5ctl capabilities --json
 ae5ctl capabilities --card Creative --json
 ```
 
+La siguiente etapa ya permite **previsualizar cambios tipados de solo lectura**
+sin modificar controles ALSA. Por ejemplo, usando los números reales
+descubiertos en tu máquina:
+
+```bash
+ae5ctl controls plan 11 50,50 --card Creative --json
+ae5ctl controls plan 43 Speakers --card Creative
+```
+
+Esos números son ilustrativos, no constantes de la AE-5. Se validan rangos,
+canales y enumerados, pero `can_apply` siempre es `false` hasta certificar
+la seguridad del motor de escritura.
+
 Las lecturas incompletas se identifican como tales y devuelven código 4, aun
 cuando se puedan conservar controles leídos correctamente. Revisa nombres de
 dispositivos antes de compartir el JSON. Se conservarán la CLI y el `.deb`

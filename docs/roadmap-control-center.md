@@ -87,3 +87,14 @@ como activas las funciones verificadas o explícitamente experimentales.
   https://github.com/klimovich008/ae5-linux-control
 
 Se revisarán las licencias de cualquier código externo antes de reutilizarlo.
+
+
+## Fase 02 · planificación tipada (PR #4)
+
+`ae5ctl controls plan NUMID VALORES` prepara diffs de BOOLEAN, INTEGER,
+INTEGER64 y ENUMERATED a partir del inventario real. Verifica cantidades,
+rangos, saltos y opciones ambiguas, y registra una identidad semántica del
+control (interfaz, nombre, índice, dispositivo y subdispositivo). Todos los
+planes indican `can_apply=false`, incluidos los controles de riesgo.
+Las escrituras controladas, rollback y activación de DSP requieren aún
+certificación física; no hay un comando general de escritura.

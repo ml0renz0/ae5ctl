@@ -11,6 +11,7 @@ from ae5ctl import __version__
 from ae5ctl.alsa import AlsaBackend, AlsaError, Status, SwitchPlan, SwitchResult
 from ae5ctl.audio_session import inspect_audio_session
 from ae5ctl.capabilities import scan_capabilities
+from ae5ctl.control_plans import plan_control
 from ae5ctl.profiles import (
     HEADPHONES_FILE,
     SPEAKERS_FILE,
@@ -29,6 +30,10 @@ SELECTION_ERRORS = {
     "card_changed",
     "control_changed",
     "state_changed",
+    "invalid_control",
+    "invalid_value",
+    "ambiguous_value",
+    "unsupported_type",
 }
 DIAGNOSTIC_NOTES = [
     "El comando doctor es de solo lectura; no modifica controles ni perfiles.",
@@ -214,6 +219,13 @@ def parser() -> argparse.ArgumentParser:
             "Solicita autorización 'CAMBIAR' antes de tocar ALSA.\n"
             "No certifica DSP, volumen, PipeWire ni la bandeja GNOME.",
         ),
+        "controls": (
+            "Previsualiza controles tipados sin escribir en ALSA.",
+            "EJEMPLOS\\n"
+            "  ae5ctl controls plan 11 40,40 --card Creative --json\\n"
+            "  ae5ctl controls plan 43 Speakers --card Creative\\n"
+            "Todos los resultados son de solo lectura; no hay cset.",
+        ),
         "profiles": (
             "Inspecciona los perfiles ALSA guardados; nunca ejecuta alsactl.",
             "EJEMPLOS\n"
@@ -238,6 +250,7 @@ def parser() -> argparse.ArgumentParser:
         ("status", "consultar la salida física seleccionada"),
         ("doctor", "diagnosticar la lectura ALSA (sin reparar audio)"),
         ("capabilities", "inventariar controles ALSA de forma segura"),
+        ("controls", "previsualizar valores tipados sin modificar ALSA"),
         ("switch", "seleccionar auriculares o altavoces"),
         ("toggle", "alternar la salida ALSA"),
         ("validate", "consultar o validar la salida AE-5"),
@@ -253,6 +266,19 @@ def parser() -> argparse.ArgumentParser:
             epilog=epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
+        if name == "controls":
+            tasks = command.add_subparsers(
+                dest="control_action", required=True, metavar="ACCIÓN"
+            )
+            plan = tasks.add_parser(
+                "plan", help="validar valores propuestos sin modificar el control"
+            )
+            plan.add_argument("numid", type=positive_int)
+            plan.add_argument("values", help="un valor por canal separado por coma")
+            plan.add_argument("--card", metavar="ID_ALSA")
+            plan.add_argument("--json", action="store_true")
+            plan.add_argument("--timeout", type=positive_timeout, default=3.0)
+            continue
         if name == "profiles":
             tasks = command.add_subparsers(
                 dest="profile_action", required=True, metavar="ACCIÓN"
@@ -577,6 +603,20 @@ def main(argv: list[str] | None = None) -> int:
             from ae5ctl.validation import run_validation
 
             return run_validation(backend, card=args.card, numid=args.numid)
+        if args.command == "controls":
+            result = plan_control(
+                backend, card=args.card, numid=args.numid, requested=args.values
+            )
+            if args.json:
+                print_json(result)
+            else:
+                print(
+                    f"Vista previa de {result['identity']['name']}: "
+                    f"{result['previous_values']} → {result['requested_values']}"
+                )
+                print("SOLO LECTURA: el control ALSA NO se ha modificado.")
+                print(result["reason"])
+            return 0
         if args.command == "capabilities":
             report = scan_capabilities(backend, card=args.card, numid=args.numid)
             if args.json:

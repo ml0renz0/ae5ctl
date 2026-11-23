@@ -20,6 +20,10 @@ _VALUE_COUNT = re.compile(r"\bvalues=(\d+)\b")
 _ITEM_COUNT = re.compile(r"\bitems=(\d+)\b")
 _RANGE = re.compile(r"\b(min|max|step)=(-?\d+)\b")
 _INTERFACE = re.compile(r"(?:^|,)iface=([^,]+)")
+_COORDINATES = {
+    name: re.compile(rf"(?:^|,){name}=(\\d+)(?:,|$)")
+    for name in ("index", "device", "subdevice")
+}
 _ITEMS = re.compile(r"^\s*;\s*Item #(\d+) '(.*)'\s*$")
 _VALUES = re.compile(r"^\s*:\s*values=(.*)$")
 _BLOCKED = re.compile(
@@ -52,6 +56,11 @@ def classify(name: str) -> tuple[str, str]:
         if pattern.search(name):
             return family, "unverified"
     return "other", "unverified"
+
+
+def _coordinate(header: str, key: str) -> int:
+    found = _COORDINATES[key].search(header)
+    return int(found[1]) if found else 0
 
 
 def parse_control_detail(text: str, expected_numid: int) -> dict:
@@ -108,6 +117,9 @@ def parse_control_detail(text: str, expected_numid: int) -> dict:
         "numid": numid,
         "name": name,
         "iface": iface[1] if iface else None,
+        "index": _coordinate(lines[0], "index"),
+        "device": _coordinate(lines[0], "device"),
+        "subdevice": _coordinate(lines[0], "subdevice"),
         "type": control_type,
         "access": access,
         "driver_reports_writable": bool(access and "w" in access[:2]),
