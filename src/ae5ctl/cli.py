@@ -328,9 +328,7 @@ def parser() -> argparse.ArgumentParser:
                 if action in {"import", "export"}:
                     task.add_argument("--force", action="store_true")
                 if action in {"capture", "set", "diff"}:
-                    task.add_argument(
-                        "--timeout", type=positive_timeout, default=3.0
-                    )
+                    task.add_argument("--timeout", type=positive_timeout, default=3.0)
                 task.add_argument("--json", action="store_true")
             continue
         if name == "controls":
@@ -651,9 +649,7 @@ def presets_command(args: argparse.Namespace) -> int:
         elif action == "show":
             output = store.read(args.name)
         elif action == "create":
-            output = store.save(
-                new_preset(args.name, args.card, args.description)
-            )
+            output = store.save(new_preset(args.name, args.card, args.description))
         elif action == "delete":
             store.delete(args.name)
             output = {"deleted": args.name}
@@ -664,9 +660,7 @@ def presets_command(args: argparse.Namespace) -> int:
             output = {"exported": args.name, "path": str(args.path)}
         elif action == "remove":
             document = store.read(args.name)
-            output = store.save(
-                remove_control(document, args.control), overwrite=True
-            )
+            output = store.save(remove_control(document, args.control), overwrite=True)
         else:
             document = None
             if action in {"set", "diff"}:

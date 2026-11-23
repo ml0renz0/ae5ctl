@@ -65,9 +65,9 @@ def simulated(monkeypatch, tmp_path):
             "ok": bool(found) if numid is not None else True,
             "card": {"id": "Creative", "index": 7, "name": "AE-5"},
             "controls": found,
-            "errors": [] if found or numid is None else [
-                {"code": "no_control", "message": "No existe el control."}
-            ],
+            "errors": []
+            if found or numid is None
+            else [{"code": "no_control", "message": "No existe el control."}],
         }
 
     monkeypatch.setattr(presets, "scan_capabilities", scan)
@@ -77,7 +77,9 @@ def simulated(monkeypatch, tmp_path):
 
 def test_create_read_list_and_delete_do_not_need_hardware(tmp_path, simulated, capsys):
     store, _controls, calls = simulated
-    assert cli.main(["presets", "create", "gaming", "--card", "Creative", "--json"]) == 0
+    assert (
+        cli.main(["presets", "create", "gaming", "--card", "Creative", "--json"]) == 0
+    )
     path = store.root / "gaming.json"
     assert path.is_file()
     assert path.stat().st_mode & 0o777 == 0o600
@@ -95,10 +97,23 @@ def test_create_read_list_and_delete_do_not_need_hardware(tmp_path, simulated, c
 
 def test_capture_selected_controls_as_semantic_fields(simulated, capsys):
     store, controls, calls = simulated
-    assert cli.main(
-        ["presets", "capture", "music", "--card", "Creative",
-         "--numid", "11", "--numid", "43", "--json"]
-    ) == 0
+    assert (
+        cli.main(
+            [
+                "presets",
+                "capture",
+                "music",
+                "--card",
+                "Creative",
+                "--numid",
+                "11",
+                "--numid",
+                "43",
+                "--json",
+            ]
+        )
+        == 0
+    )
     doc = json.loads(capsys.readouterr().out)
     assert len(doc["controls"]) == 2
     assert all("numid" not in entry for entry in doc["controls"])
@@ -115,9 +130,12 @@ def test_set_updates_values_and_diff_reads_but_does_not_write(simulated, capsys)
     _store, controls, calls = simulated
     assert cli.main(["presets", "create", "gaming", "--card", "Creative"]) == 0
     capsys.readouterr()
-    assert cli.main(
-        ["presets", "set", "gaming", "--numid", "11", "--values", "70,70", "--json"]
-    ) == 0
+    assert (
+        cli.main(
+            ["presets", "set", "gaming", "--numid", "11", "--values", "70,70", "--json"]
+        )
+        == 0
+    )
     doc = json.loads(capsys.readouterr().out)
     assert doc["controls"][0]["values"] == ["70", "70"]
     assert cli.main(["presets", "diff", "gaming", "--json"]) == 0
@@ -130,16 +148,31 @@ def test_set_updates_values_and_diff_reads_but_does_not_write(simulated, capsys)
     assert calls == [11, None]
 
 
-def test_remove_semantic_control_and_export_import_roundtrip(simulated, tmp_path, capsys):
+def test_remove_semantic_control_and_export_import_roundtrip(
+    simulated, tmp_path, capsys
+):
     store, _controls, _calls = simulated
-    assert cli.main(
-        ["presets", "capture", "music", "--card", "Creative",
-         "--numid", "11", "--numid", "43"]
-    ) == 0
+    assert (
+        cli.main(
+            [
+                "presets",
+                "capture",
+                "music",
+                "--card",
+                "Creative",
+                "--numid",
+                "11",
+                "--numid",
+                "43",
+            ]
+        )
+        == 0
+    )
     capsys.readouterr()
-    assert cli.main(
-        ["presets", "remove", "music", "--control", "Output Select", "--json"]
-    ) == 0
+    assert (
+        cli.main(["presets", "remove", "music", "--control", "Output Select", "--json"])
+        == 0
+    )
     doc = json.loads(capsys.readouterr().out)
     assert len(doc["controls"]) == 1
     exported = tmp_path / "music-export.json"
@@ -153,9 +186,10 @@ def test_remove_semantic_control_and_export_import_roundtrip(simulated, tmp_path
 
 def test_missing_control_is_reported_as_incompatible(simulated, capsys):
     _store, controls, _calls = simulated
-    assert cli.main(
-        ["presets", "capture", "game", "--card", "Creative", "--numid", "11"]
-    ) == 0
+    assert (
+        cli.main(["presets", "capture", "game", "--card", "Creative", "--numid", "11"])
+        == 0
+    )
     capsys.readouterr()
     controls.clear()
     assert cli.main(["presets", "diff", "game", "--json"]) == 0
@@ -166,9 +200,10 @@ def test_missing_control_is_reported_as_incompatible(simulated, capsys):
 
 def test_blocked_driver_control_is_never_marked_write_ready(simulated, capsys):
     _store, controls, _calls = simulated
-    assert cli.main(
-        ["presets", "capture", "game", "--card", "Creative", "--numid", "11"]
-    ) == 0
+    assert (
+        cli.main(["presets", "capture", "game", "--card", "Creative", "--numid", "11"])
+        == 0
+    )
     capsys.readouterr()
     controls[0]["write_policy"] = "blocked"
     assert cli.main(["presets", "diff", "game", "--json"]) == 0
@@ -180,10 +215,23 @@ def test_blocked_driver_control_is_never_marked_write_ready(simulated, capsys):
 
 def test_duplicate_numid_capture_rejected_before_io(simulated, capsys):
     store, _controls, calls = simulated
-    assert cli.main(
-        ["presets", "capture", "oops", "--card", "Creative", "--numid", "11",
-         "--numid", "11", "--json"]
-    ) == 4
+    assert (
+        cli.main(
+            [
+                "presets",
+                "capture",
+                "oops",
+                "--card",
+                "Creative",
+                "--numid",
+                "11",
+                "--numid",
+                "11",
+                "--json",
+            ]
+        )
+        == 4
+    )
     result = json.loads(capsys.readouterr().out)
     assert result["error"]["code"] == "duplicate_control"
     assert calls == []
@@ -220,8 +268,11 @@ def test_unsafe_preset_names_cannot_escape_directory(tmp_path, name):
 def test_duplicate_semantic_controls_and_malformed_types_are_rejected():
     doc = new_preset("gaming", "Creative")
     identity = {
-        "iface": "MIXER", "name": "Volume",
-        "index": 0, "device": 0, "subdevice": 0,
+        "iface": "MIXER",
+        "name": "Volume",
+        "index": 0,
+        "device": 0,
+        "subdevice": 0,
     }
     entry = {"identity": identity, "type": "INTEGER", "values": ["10"]}
     doc["controls"] = [entry, dict(entry)]
@@ -269,9 +320,15 @@ def test_symlinks_rejected_on_import_and_store_directory(tmp_path):
 def test_remove_ambiguous_name_fails_instead_of_guessing():
     doc = new_preset("game", "Creative")
     first = {
-        "identity": {"iface": "MIXER", "name": "Volume",
-                     "index": 0, "device": 0, "subdevice": 0},
-        "type": "INTEGER", "values": ["20"],
+        "identity": {
+            "iface": "MIXER",
+            "name": "Volume",
+            "index": 0,
+            "device": 0,
+            "subdevice": 0,
+        },
+        "type": "INTEGER",
+        "values": ["20"],
     }
     second = {
         **first,

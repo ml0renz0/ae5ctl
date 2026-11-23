@@ -30,7 +30,11 @@ class PresetError(Exception):
 
 
 def _dict(value, fields, required):
-    if type(value) is not dict or not required <= value.keys() or not value.keys() <= fields:
+    if (
+        type(value) is not dict
+        or not required <= value.keys()
+        or not value.keys() <= fields
+    ):
         raise PresetError("invalid_preset", "Estructura JSON del preset inválida.")
 
 
@@ -43,7 +47,8 @@ def _string(value, label, limit=128):
 def _name(value):
     if type(value) is not str or not NAME_PATTERN.fullmatch(value):
         raise PresetError(
-            "invalid_name", "Nombre inválido: use 1-48 letras ASCII, números, - o _.",
+            "invalid_name",
+            "Nombre inválido: use 1-48 letras ASCII, números, - o _.",
         )
     return value
 
@@ -79,12 +84,16 @@ def validate(document):
         for field in ("index", "device", "subdevice"):
             value = identity[field]
             if type(value) is not int or not 0 <= value <= 65535:
-                raise PresetError("invalid_preset", f"Coordenada ALSA {field} inválida.")
+                raise PresetError(
+                    "invalid_preset", f"Coordenada ALSA {field} inválida."
+                )
         if _key(entry) in seen:
             raise PresetError("duplicate_control", "El preset repite un control.")
         seen.add(_key(entry))
         if type(entry["type"]) is not str or entry["type"] not in TYPES:
-            raise PresetError("unsupported_type", "Tipo ALSA no compatible con presets.")
+            raise PresetError(
+                "unsupported_type", "Tipo ALSA no compatible con presets."
+            )
         values = entry["values"]
         if type(values) is not list or not 1 <= len(values) <= MAX_VALUES:
             raise PresetError("invalid_preset", "Número de valores ALSA inválido.")
@@ -105,12 +114,16 @@ def _decode(text: str):
     try:
         return validate(json.loads(text, object_pairs_hook=unique))
     except (ValueError, TypeError, RecursionError) as exc:
-        raise PresetError("invalid_json", "No se pudo interpretar el JSON del preset.") from exc
+        raise PresetError(
+            "invalid_json", "No se pudo interpretar el JSON del preset."
+        ) from exc
 
 
 def _load(path: Path):
     if path.is_symlink() or not path.is_file():
-        raise PresetError("file_missing", "Fichero inexistente o enlace simbólico no permitido.")
+        raise PresetError(
+            "file_missing", "Fichero inexistente o enlace simbólico no permitido."
+        )
     try:
         with path.open("rb") as handle:
             raw = handle.read(MAX_BYTES + 1)
@@ -137,7 +150,9 @@ def _write(path: Path, document: dict, *, overwrite=False):
         parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         if parent.is_symlink() or not parent.is_dir():
             raise PresetError("unsafe_directory", "Directorio de presets inseguro.")
-        with tempfile.NamedTemporaryFile(dir=parent, prefix=".ae5ctl-", delete=False) as out:
+        with tempfile.NamedTemporaryFile(
+            dir=parent, prefix=".ae5ctl-", delete=False
+        ) as out:
             tmp = Path(out.name)
             os.fchmod(out.fileno(), 0o600)
             out.write(raw)
@@ -149,9 +164,13 @@ def _write(path: Path, document: dict, *, overwrite=False):
             # Atomic create without replacing an existing file, including links.
             os.link(tmp, path, follow_symlinks=False)
     except FileExistsError as exc:
-        raise PresetError("already_exists", "Ya existe un preset con ese nombre.") from exc
+        raise PresetError(
+            "already_exists", "Ya existe un preset con ese nombre."
+        ) from exc
     except OSError as exc:
-        raise PresetError("file_error", f"No se pudo guardar {path.name}: {exc}") from exc
+        raise PresetError(
+            "file_error", f"No se pudo guardar {path.name}: {exc}"
+        ) from exc
     finally:
         if tmp is not None:
             tmp.unlink(missing_ok=True)
@@ -176,19 +195,25 @@ class PresetStore:
         for path in sorted(self.root.glob("*.json")):
             doc = _load(path)
             if path.stem != doc["name"]:
-                raise PresetError("invalid_preset", "Nombre de archivo y preset no coinciden.")
-            result.append({
-                "name": doc["name"],
-                "card_id": doc["card_id"],
-                "description": doc.get("description", ""),
-                "controls": len(doc["controls"]),
-            })
+                raise PresetError(
+                    "invalid_preset", "Nombre de archivo y preset no coinciden."
+                )
+            result.append(
+                {
+                    "name": doc["name"],
+                    "card_id": doc["card_id"],
+                    "description": doc.get("description", ""),
+                    "controls": len(doc["controls"]),
+                }
+            )
         return result
 
     def read(self, name):
         doc = _load(self._path(name))
         if doc["name"] != name:
-            raise PresetError("invalid_preset", "Nombre de preset no coincide con el archivo.")
+            raise PresetError(
+                "invalid_preset", "Nombre de preset no coincide con el archivo."
+            )
         return doc
 
     def save(self, document, *, overwrite=False):
@@ -203,7 +228,9 @@ class PresetStore:
         try:
             path.unlink()
         except OSError as exc:
-            raise PresetError("file_error", f"No se pudo borrar el preset: {exc}") from exc
+            raise PresetError(
+                "file_error", f"No se pudo borrar el preset: {exc}"
+            ) from exc
 
     def import_file(self, source, *, overwrite=False):
         return self.save(_load(Path(source)), overwrite=overwrite)
@@ -215,13 +242,15 @@ class PresetStore:
 
 
 def new_preset(name, card_id, description=""):
-    return validate({
-        "schema_version": SCHEMA_VERSION,
-        "name": name,
-        "description": description,
-        "card_id": card_id,
-        "controls": [],
-    })
+    return validate(
+        {
+            "schema_version": SCHEMA_VERSION,
+            "name": name,
+            "description": description,
+            "card_id": card_id,
+            "controls": [],
+        }
+    )
 
 
 def _semantic(control):
@@ -242,7 +271,9 @@ def read_control(backend, card_id, numid, desired=None):
         error = report["errors"][0]
         raise AlsaError(error["code"], error["message"])
     if len(report["controls"]) != 1:
-        raise PresetError("control_missing", "El control solicitado no está disponible.")
+        raise PresetError(
+            "control_missing", "El control solicitado no está disponible."
+        )
     if report["card"]["id"] != card_id:
         raise PresetError("card_mismatch", "Identidad de tarjeta inesperada.")
     control = report["controls"][0]
@@ -258,10 +289,14 @@ def read_control(backend, card_id, numid, desired=None):
 def set_control(document, entry):
     """Replace a semantically identical control or append a new one."""
     validate(document)
-    validate({
-        "schema_version": 1, "name": "test", "card_id": document["card_id"],
-        "controls": [entry],
-    })
+    validate(
+        {
+            "schema_version": 1,
+            "name": "test",
+            "card_id": document["card_id"],
+            "controls": [entry],
+        }
+    )
     controls = document["controls"]
     for index, previous in enumerate(controls):
         if _key(previous) == _key(entry):
@@ -279,13 +314,17 @@ def set_control(document, entry):
 
 def remove_control(document, control_name):
     _string(control_name, "nombre de control")
-    matching = [entry for entry in document["controls"]
-                if entry["identity"]["name"] == control_name]
+    matching = [
+        entry
+        for entry in document["controls"]
+        if entry["identity"]["name"] == control_name
+    ]
     if not matching:
         raise PresetError("control_missing", "El preset no contiene ese control.")
     if len(matching) > 1:
         raise PresetError(
-            "ambiguous_control", "Nombre duplicado; es necesario identificar el control.",
+            "ambiguous_control",
+            "Nombre duplicado; es necesario identificar el control.",
         )
     document["controls"].remove(matching[0])
     return validate(document)
@@ -302,7 +341,9 @@ def compare(document, backend):
         raise PresetError("card_mismatch", "La identidad de tarjeta no coincide.")
     indexed = {}
     for control in report["controls"]:
-        indexed.setdefault(tuple(control[name] for name in IDENTITY), []).append(control)
+        indexed.setdefault(tuple(control[name] for name in IDENTITY), []).append(
+            control
+        )
     results = []
     compatible = True
     for entry in document["controls"]:
