@@ -200,3 +200,38 @@ def test_no_op_does_not_write_but_requires_approval(tmp_path):
     result = apply_certified_control(sim.backend, plan, approval=sim.approved(plan))
     assert result["changed"] is False
     assert not sim.writes()
+
+
+def test_interrupted_readback_after_cset_recovers_initial_value(tmp_path):
+    sim = SimulatedCard(tmp_path)
+    plan = sim.plan()
+    interrupted = False
+
+    def interrupt_once_after_write(device):
+        nonlocal interrupted
+        if device.writes() and not interrupted:
+            interrupted = True
+            raise KeyboardInterrupt
+
+    sim.on_read = interrupt_once_after_write
+    with pytest.raises(AlsaError) as error:
+        apply_certified_control(sim.backend, plan, approval=sim.approved(plan))
+    assert error.value.code == "apply_failed_restored"
+    assert sim.values == ["40", "40"]
+    assert len(sim.writes()) == 2
+
+
+def test_interruption_during_recovery_read_reports_uncertain(tmp_path):
+    sim = SimulatedCard(tmp_path)
+    plan = sim.plan()
+    sim.write_error_after_mutation = True
+
+    def interrupt_when_verifying_recovery(device):
+        if device.writes():
+            raise KeyboardInterrupt
+
+    sim.on_read = interrupt_when_verifying_recovery
+    with pytest.raises(AlsaError) as error:
+        apply_certified_control(sim.backend, plan, approval=sim.approved(plan))
+    assert error.value.code == "recovery_uncertain"
+    assert len(sim.writes()) == 1

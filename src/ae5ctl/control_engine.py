@@ -47,7 +47,7 @@ def _restore_after_attempt(
     """Only restore if current value still equals the value WE requested."""
     try:
         actual = _read_exact(backend, plan)
-    except AlsaError as exc:
+    except (AlsaError, KeyboardInterrupt) as exc:
         raise AlsaError(
             "recovery_uncertain",
             f"{issue}; no se pudo verificar el estado para restaurar: {exc}",
@@ -132,8 +132,9 @@ def apply_certified_control(
         _restore_after_attempt(backend, plan, previous, target, str(exc))
     try:
         observed = _read_exact(backend, plan)
-    except AlsaError as exc:
-        _restore_after_attempt(backend, plan, previous, target, str(exc))
+    except (AlsaError, KeyboardInterrupt) as exc:
+        detail = str(exc) or "Verificación interrumpida por el usuario"
+        _restore_after_attempt(backend, plan, previous, target, detail)
     if observed != target:
         _restore_after_attempt(
             backend, plan, previous, target, "La escritura no se verificó."
