@@ -37,9 +37,7 @@ def item(kind, values, *, minimum=0, maximum=100, step=0, items=None):
     ],
 )
 def test_valid_numeric_and_boolean_values(kind, current, wanted, expected):
-    assert normalize(
-        item(kind, current, minimum=-100, maximum=100), wanted
-    ) == expected
+    assert normalize(item(kind, current, minimum=-100, maximum=100), wanted) == expected
 
 
 @pytest.mark.parametrize("wanted", ["-1", "101", "1.2", "x", "3,4"])
@@ -113,9 +111,10 @@ def test_plan_includes_semantic_identity_and_never_permits_write(model):
     assert "command" not in result
     assert calls == [{"card": "Creative", "numid": 7}]
     report["controls"][0]["write_policy"] = "blocked"
-    assert plan_control(backend, card=None, numid=7, requested="40,40")[
-        "can_apply"
-    ] is False
+    assert (
+        plan_control(backend, card=None, numid=7, requested="40,40")["can_apply"]
+        is False
+    )
 
 
 def test_report_error_fails_closed(model):
