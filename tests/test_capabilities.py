@@ -66,7 +66,9 @@ def test_discovery_inventories_all_types_without_any_write(backend):
     by_name = {item["name"]: item for item in report["controls"]}
     assert by_name["Master Playback Volume"]["values"] == ["60", "60"]
     assert by_name["Master Playback Volume"]["range"] == {
-        "min": 0, "max": 100, "step": 0
+        "min": 0,
+        "max": 100,
+        "step": 0,
     }
     assert by_name["Output Select"]["items"] == {"0": "Headphone", "1": "Speakers"}
     assert by_name["Output Select"]["family"] == "routing"
@@ -104,7 +106,9 @@ def test_readonly_driver_flags_still_never_authorize_writes():
     assert item["editable_by_ae5ctl"] is False
 
 
-def test_partial_error_keeps_valid_items_and_exits_nonzero(backend, capsys, monkeypatch):
+def test_partial_error_keeps_valid_items_and_exits_nonzero(
+    backend, capsys, monkeypatch
+):
     device, calls = backend
     original = device._read
 
@@ -152,7 +156,9 @@ def test_mismatched_numid_and_incomplete_enum_fail_closed():
 def test_cli_scans_selected_card_and_json_contract(backend, monkeypatch, capsys):
     device, calls = backend
     monkeypatch.setattr(cli, "AlsaBackend", lambda **kwargs: device)
-    assert cli.main(["capabilities", "--card", "Creative", "--numid", "43", "--json"]) == 0
+    assert (
+        cli.main(["capabilities", "--card", "Creative", "--numid", "43", "--json"]) == 0
+    )
     result = json.loads(capsys.readouterr().out)
     assert result["scope"] == "alsa_capabilities"
     assert result["summary"]["discovered"] == 1

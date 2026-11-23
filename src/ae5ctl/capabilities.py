@@ -101,9 +101,7 @@ def parse_control_detail(text: str, expected_numid: int) -> dict:
             or set(item_labels) != set(range(len(item_labels)))
         ):
             raise AlsaError("parse_error", "cget enumerado incompleto.")
-        if any(
-            not v.isdecimal() or int(v) not in item_labels for v in selections
-        ):
+        if any(not v.isdecimal() or int(v) not in item_labels for v in selections):
             raise AlsaError("parse_error", "cget enumerado contiene índices inválidos.")
     family, policy = classify(name)
     return {
@@ -145,7 +143,9 @@ def scan_capabilities(
                 continue
             number, _name = _header(line)
             if number in seen:
-                raise AlsaError("parse_error", "amixer controls incluye numid duplicado.")
+                raise AlsaError(
+                    "parse_error", "amixer controls incluye numid duplicado."
+                )
             seen.add(number)
             numbers.append(number)
             if len(numbers) > MAX_CONTROLS:
@@ -157,9 +157,7 @@ def scan_capabilities(
             text = backend._read(selected, "cget", f"numid={number}")
             controls.append(parse_control_detail(text, number))
         except AlsaError as error:
-            errors.append(
-                {"numid": number, "code": error.code, "message": str(error)}
-            )
+            errors.append({"numid": number, "code": error.code, "message": str(error)})
     families = Counter(control["family"] for control in controls)
     return {
         "schema_version": 1,
