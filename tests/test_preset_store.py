@@ -10,7 +10,6 @@ from ae5ctl import preset_store as presets
 from ae5ctl.preset_store import (
     PresetError,
     PresetStore,
-    compare,
     new_preset,
     remove_control,
     set_control,
@@ -63,10 +62,10 @@ def simulated(monkeypatch, tmp_path):
         calls.append(numid)
         found = [item for item in selected if numid is None or item["numid"] == numid]
         return {
-            "ok": bool(found),
+            "ok": bool(found) if numid is not None else True,
             "card": {"id": "Creative", "index": 7, "name": "AE-5"},
             "controls": found,
-            "errors": [] if found else [
+            "errors": [] if found or numid is None else [
                 {"code": "no_control", "message": "No existe el control."}
             ],
         }

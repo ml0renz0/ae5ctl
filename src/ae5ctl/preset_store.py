@@ -163,6 +163,8 @@ class PresetStore:
         self.root = Path(root) if root is not None else base / "ae5ctl" / "presets"
 
     def _path(self, name):
+        if self.root.is_symlink():
+            raise PresetError("unsafe_directory", "Directorio de presets enlazado.")
         return self.root / (_name(name) + ".json")
 
     def list(self):
