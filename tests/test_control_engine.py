@@ -13,8 +13,8 @@ class SimulatedCard:
     def __init__(self, tmp_path, *, name="Master Playback Volume"):
         self.cards_path = tmp_path / "cards"
         self.cards_path.write_text(
-            " 7 [Creative       ]: HDA-Intel - HDA Creative\\n"
-            "                      Sound BlasterX AE-5\\n",
+            " 7 [Creative       ]: HDA-Intel - HDA Creative\n"
+            "                      Sound BlasterX AE-5\n",
             encoding="utf-8",
         )
         self.name = name
@@ -39,9 +39,9 @@ class SimulatedCard:
                 self.on_read(self)
             value = ",".join(self.values)
             payload = (
-                f"numid=11,iface=MIXER,name='{self.name}'\\n"
-                "  ; type=INTEGER,access=rw------,values=2,min=0,max=100,step=1\\n"
-                f"  : values={value}\\n"
+                f"numid=11,iface=MIXER,name='{self.name}'\n"
+                "  ; type=INTEGER,access=rw------,values=2,min=0,max=100,step=1\n"
+                f"  : values={value}\n"
             )
             return subprocess.CompletedProcess(command, 0, payload, "")
         if action[:2] == ["cset", "numid=11"]:
@@ -60,9 +60,7 @@ class SimulatedCard:
         raise AssertionError(f"Unexpected ALSA operation: {action}")
 
     def plan(self, request="50,50"):
-        return plan_control(
-            self.backend, card="Creative", numid=11, requested=request
-        )
+        return plan_control(self.backend, card="Creative", numid=11, requested=request)
 
     def approved(self, plan):
         return ControlApproval(
@@ -87,9 +85,7 @@ def test_simulated_certification_checks_and_verifies_exact_output(tmp_path):
     sim = SimulatedCard(tmp_path)
     plan = sim.plan()
     result = apply_certified_control(sim.backend, plan, approval=sim.approved(plan))
-    assert result == {
-        "changed": True, "verified": True, "output_values": ["50", "50"]
-    }
+    assert result == {"changed": True, "verified": True, "output_values": ["50", "50"]}
     assert sim.values == ["50", "50"]
     assert sim.writes() == [["cset", "numid=11", "50,50"]]
 

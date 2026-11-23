@@ -123,9 +123,7 @@ def apply_certified_control(
     if _read_exact(backend, plan) != previous:
         raise AlsaError("state_changed", "La lectura del plan ya no está vigente.")
     if previous == target:
-        return {
-            "changed": False, "verified": True, "output_values": list(previous)
-        }
+        return {"changed": False, "verified": True, "output_values": list(previous)}
     if _read_exact(backend, plan) != previous:
         raise AlsaError("state_changed", "Otro cliente cambió ALSA antes de cset.")
     try:
