@@ -402,8 +402,12 @@ def test_overview_scans_each_card_once_and_keeps_read_only_contract(simulated, c
     assert response["read_only"] is True
     assert response["can_apply"] is False
     assert response["summary"] == {
-        "total": 4, "matching": 2, "different": 1,
-        "incompatible": 0, "unavailable": 0, "empty": 1,
+        "total": 4,
+        "matching": 2,
+        "different": 1,
+        "incompatible": 0,
+        "unavailable": 0,
+        "empty": 1,
         "scanned_cards": 1,
     }
     by_name = {item["name"]: item for item in response["presets"]}
@@ -418,17 +422,19 @@ def test_overview_scans_each_card_once_and_keeps_read_only_contract(simulated, c
 def test_overview_missing_controls_and_inventory_errors_are_distinct(simulated, capsys):
     store, controls, calls = simulated
     doc = new_preset("missing-control", "Creative")
-    doc["controls"].append({
-        "identity": {
-            "iface": "MIXER",
-            "name": "Missing Control",
-            "index": 0,
-            "device": 0,
-            "subdevice": 0,
-        },
-        "type": "INTEGER",
-        "values": ["20", "20"],
-    })
+    doc["controls"].append(
+        {
+            "identity": {
+                "iface": "MIXER",
+                "name": "Missing Control",
+                "index": 0,
+                "device": 0,
+                "subdevice": 0,
+            },
+            "type": "INTEGER",
+            "values": ["20", "20"],
+        }
+    )
     store.save(doc)
     assert cli.main(["presets", "overview", "--json"]) == 0
     first = json.loads(capsys.readouterr().out)

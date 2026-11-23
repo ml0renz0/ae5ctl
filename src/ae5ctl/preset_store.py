@@ -452,10 +452,14 @@ def overview(store: PresetStore, backend, *, card_id: str | None = None) -> dict
             "summary": None,
         }
         if not report["ok"]:
-            issue = report["errors"][0] if report.get("errors") else {
-                "code": "inventory_incomplete",
-                "message": "El inventario ALSA no está completo.",
-            }
+            issue = (
+                report["errors"][0]
+                if report.get("errors")
+                else {
+                    "code": "inventory_incomplete",
+                    "message": "El inventario ALSA no está completo.",
+                }
+            )
             entry["error"] = issue
             if not any(error["card_id"] == card for error in errors):
                 errors.append({"card_id": card, **issue})
