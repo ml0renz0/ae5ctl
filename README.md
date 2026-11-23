@@ -380,3 +380,14 @@ la CLI como paquete Python o generar un `.deb` de desarrollo. CI/CD publica
 las versiones etiquetadas y verificadas de `main` como prereleases. El arranque automático y la
 validación funcional con hardware siguen pendientes, al igual que la elección
 de licencia del proyecto.
+
+
+### Motor de escritura seguro (fase experimental, no habilitado)
+
+El código incluye `control_engine`, un motor transaccional probado contra ALSA
+simulado. Revalida la tarjeta y los metadatos antes de cambiar valores,
+verifica la respuesta y contempla rollback condicionado para no pisar cambios
+de terceros. **No hay todavía `ae5ctl controls set` ni autorizaciones reales
+para DSP, ecualización, volumen o ganancia.** Que el controlador diga
+`access=rw` no certifica un control. La capacidad de escritura solo se
+habilitará tras pruebas físicas y una revisión explícita de seguridad.

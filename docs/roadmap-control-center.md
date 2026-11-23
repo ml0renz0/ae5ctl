@@ -98,3 +98,25 @@ control (interfaz, nombre, índice, dispositivo y subdispositivo). Todos los
 planes indican `can_apply=false`, incluidos los controles de riesgo.
 Las escrituras controladas, rollback y activación de DSP requieren aún
 certificación física; no hay un comando general de escritura.
+
+
+## Fase 02 · motor de aplicación condicionado (PR #4)
+
+Se incorpora `control_engine.apply_certified_control` como **API interna** sin
+comando CLI, GNOME o entrada desde presets. Exige un `ControlApproval` de origen
+confiable que coincida con el fingerprint del contrato ALSA y con el vector
+exacto de valores permitidos. **No se distribuyen aprobaciones reales**: sin
+ellas se devuelve `not_certified` antes de escribir nada; la política
+`blocked` tampoco puede levantarse mediante una aprobación de prueba.
+
+El motor lee el control, compara tarjeta, identidad semántica, acceso, tipo,
+opciones, rango y número de canales, y verifica el estado justo antes de
+`cset`. Tras escribir comprueba el valor leído. Ante fallo intenta rollback
+**solo cuando el valor observado aún coincide con el que él escribió**; si un
+tercero lo cambió, no sobrescribe su estado. Los errores de recuperación son
+explícitos. ALSA no ofrece compare-and-swap atómico; la recuperación física no
+puede garantizarse ante desconexiones, fallo de permisos o interrupción severa.
+
+Toda esta fase se prueba únicamente contra ALSA simulado. La certificación de
+controles de hardware, la carga de aprobaciones y una UI de escritura continúan
+pendientes hasta disponer de evidencia y validación manual de la AE-5.

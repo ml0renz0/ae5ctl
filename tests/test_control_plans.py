@@ -140,3 +140,14 @@ def test_cli_invalid_values_fail_explicitly(monkeypatch, capsys, model):
     monkeypatch.setattr(cli, "AlsaBackend", lambda **kwargs: backend)
     assert cli.main(["controls", "plan", "7", "101,101", "--json"]) == 3
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "invalid_value"
+
+
+def test_plan_contains_full_control_contract_for_future_stale_guards(model):
+    from ae5ctl.control_plans import fingerprint
+
+    backend, _report, _ = model
+    plan = plan_control(backend, card="Creative", numid=7, requested="50,50")
+    assert plan["contract"]["identity"]["name"] == "Test Control"
+    assert plan["contract"]["value_count"] == 2
+    assert plan["contract_fingerprint"] == fingerprint(plan["contract"])
+    assert len(plan["contract_fingerprint"]) == 64

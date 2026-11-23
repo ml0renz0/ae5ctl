@@ -3,6 +3,9 @@
 A preview is never permission to write: no cset or other ALSA mutation here.
 """
 
+import hashlib
+import json
+
 from ae5ctl.alsa import AlsaBackend, AlsaError
 from ae5ctl.capabilities import scan_capabilities
 
@@ -73,6 +76,34 @@ def normalize(control: dict, requested: str) -> list[str]:
     )
 
 
+def contract(card: dict, control: dict) -> dict:
+    """Snapshot metadata required to identify the same exact ALSA control."""
+    return {
+        "card": dict(card),
+        "identity": {
+            "card_id": card["id"],
+            "iface": control["iface"],
+            "name": control["name"],
+            "index": control["index"],
+            "device": control["device"],
+            "subdevice": control["subdevice"],
+        },
+        "type": control["type"],
+        "access": control["access"],
+        "items": dict(control["items"]),
+        "range": dict(control["range"]),
+        "value_count": len(control["values"]),
+    }
+
+
+def fingerprint(snapshot: dict) -> str:
+    """Stable contract fingerprint; not a security credential."""
+    encoded = json.dumps(
+        snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def plan_control(
     backend: AlsaBackend, *, card: str | None, numid: int, requested: str
 ) -> dict:
@@ -97,6 +128,7 @@ def plan_control(
             else value
             for value in current
         ]
+    snapshot = contract(report["card"], control)
     return {
         "schema_version": 1,
         "scope": "alsa_control_plan",
@@ -111,6 +143,8 @@ def plan_control(
             "subdevice": control["subdevice"],
         },
         "lookup_numid": control["numid"],
+        "contract": snapshot,
+        "contract_fingerprint": fingerprint(snapshot),
         "type": control["type"],
         "previous_values": current,
         "requested_values": values,
