@@ -100,6 +100,17 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Upload explicitly requested PR package (24-hour retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ae5ctl-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/*.deb
+            dist/*.deb.sha256
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
   required:
     name: CI required
     needs: [tests, deb]

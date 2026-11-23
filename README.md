@@ -84,8 +84,10 @@ Ninguna etiqueta está aplicada a la PR #4.
 
 El pytest habitual excluye las pruebas que generan paquetes. Para ejecutarlas
 expresamente: `python -m pytest -m package`. Los paquetes solo se conservan
-en GitHub Releases cuando publicamos una versión; no se suben artefactos
-intermedios a GitHub Actions. Más detalles en [empaquetado](docs/deb-packages.md).
+en GitHub Releases cuando publicamos una versión. En PR con `build-deb`,
+el `.deb` y su SHA-256 probados se pueden descargar como ZIP desde **Actions →
+ejecución de CI → Artifacts**, con retención de un día. Las PR normales no
+generan artefactos. Más detalles en [empaquetado](docs/deb-packages.md).
 
 ## Comparar perfiles ALSA originales (solo lectura)
 

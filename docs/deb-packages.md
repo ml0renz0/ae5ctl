@@ -129,8 +129,9 @@ El empaquetado tiene únicamente dos activadores explícitos:
 
 - **Etiqueta de PR `build-deb`:** ejecutar pruebas de empaquetado, generar
   un `.deb` y comprobar la instalación y retirada en contenedores Ubuntu
-  22.04 y 24.04. Si se quita la etiqueta, los siguientes commits de esa PR
-  ya no generan paquetes. La PR #4 no lleva la etiqueta.
+  22.04 y 24.04. Solo si ambas pruebas pasan, sube el `.deb` y su SHA-256
+  como un único artefacto descargable (ZIP) durante **un día**. Si se quita
+  la etiqueta, los siguientes commits ya no generan paquetes ni artefactos.
 - **Etiqueta Git de versión `v<version>`:** iniciar una release desde el
   código ya fusionado en `main`. El nombre debe coincidir exactamente
   con `[project].version` de `pyproject.toml` y el commit debe pertenecer
@@ -152,15 +153,21 @@ El check estable `CI required` continúa siendo el requisito de protección de
 también exige sus pruebas y ambos smoke tests. Sin esa etiqueta de PR, espera
 que el job Debian figure como `skipped`.
 
-**No se emplea `upload-artifact` ni `download-artifact` para los paquetes.**
-En PR con `build-deb`, el paquete permanece en el runner temporal. En un push
-de etiqueta Git de versión, el job de publicación valida la versión y su
-pertenencia a `main`, ejecuta los tests de empaquetado, **construye una sola
-vez**, prueba instalación y retirada en Ubuntu 22.04/24.04 y firma ese mismo
-`.deb` probado. Deja los cuatro archivos (`.deb`, `.deb.sha256`, `.deb.sig`,
-`signing-public.pem`) únicamente en GitHub Releases. Nunca se transfiere
-un paquete entre runners. Esto evita consumir almacenamiento de artefactos de Actions;
-los logs y la caché de pip mantienen su propia política de retención.
+**Descarga de paquetes de PR bajo demanda:** solo el job `Debian package
+(opt-in)` utiliza `actions/upload-artifact`, después de superar los smoke
+tests. Conserva un único ZIP que contiene `.deb` y `.deb.sha256` durante
+**1 día**. Para descargarlo, abre la ejecución verde desde la pestaña
+**Actions** y busca **Artifacts** al final de la página; después descomprime
+el ZIP y valida `sha256sum -c ./*.deb.sha256`. Requiere iniciar sesión en
+GitHub; no hay paquetes de PR firmados ni publicados en Releases.
+
+Las PR sin `build-deb` no generan artefactos. Para una etiqueta Git de
+versión, el job de publicación valida versión y pertenencia a `main`, ejecuta
+las pruebas de empaquetado, **construye una sola vez**, realiza smoke tests
+en Ubuntu 22.04/24.04 y firma ese mismo `.deb` probado. Deja los cuatro
+archivos (`.deb`, `.deb.sha256`, `.deb.sig`, `signing-public.pem`)
+únicamente en GitHub Releases. No se transfieren paquetes entre runners.
+Los logs y la caché de pip mantienen su propia política de retención.
 
 Las pruebas que crean paquetes se marcan `package` y están excluidas incluso
 del pytest predeterminado en local:
