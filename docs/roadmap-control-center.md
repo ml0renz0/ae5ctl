@@ -139,3 +139,18 @@ como etiquetas semánticas y se resuelven contra las opciones actuales.
 `presets diff` compara identidades exactas, tipos, valores y restricciones
 contra ALSA, sin escribir. No existe `presets apply`; la aplicación con
 rollback y su certificación real sigue pendiente.
+
+
+## Fase 03 · contrato de listado para GNOME (PR #4)
+
+`ae5ctl presets overview --json [--card ID]` presenta un resumen versionado
+de todos los presets locales. Agrupa la lectura por tarjeta ALSA para evitar
+un inventario completo por preset; reutiliza el mismo comparador semántico
+que `presets diff`, sin duplicar reglas. Estados: `matching`, `different`,
+`incompatible`, `unavailable` y `empty`; `matching` **no** implica que
+se haya seleccionado ni aplicado el preset. El contrato lleva siempre
+`read_only=true` y `can_apply=false`. Los fallos de una tarjeta se
+reflejan en resultados individuales y un código de salida distinto de cero.
+`presets duplicate ORIGEN DESTINO` clona un preset validado sin sobrescribir
+su origen ni un destino existente. La futura UI debe usar este contrato sin
+inventar «perfiles activos» por coincidencia de valores.

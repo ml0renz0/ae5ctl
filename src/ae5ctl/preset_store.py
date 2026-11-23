@@ -221,6 +221,12 @@ class PresetStore:
         _write(self._path(document["name"]), document, overwrite=overwrite)
         return document
 
+    def duplicate(self, source, destination):
+        """Copy one validated preset without touching the source or ALSA."""
+        document = self.read(source)
+        document["name"] = _name(destination)
+        return self.save(document)
+
     def delete(self, name):
         path = self._path(name)
         if path.is_symlink() or not path.is_file():
@@ -334,6 +340,12 @@ def compare(document, backend):
     """Read-only semantic diff against ONE ALSA card; NEVER apply values."""
     validate(document)
     report = scan_capabilities(backend, card=document["card_id"])
+    return compare_report(document, report)
+
+
+def compare_report(document, report):
+    """Compare with a previously fetched ALSA snapshot; no further hardware IO."""
+    validate(document)
     if not report["ok"]:
         error = report["errors"][0]
         raise AlsaError(error["code"], error["message"])
@@ -398,5 +410,88 @@ def compare(document, backend):
         "notes": [
             "Comparación únicamente: no se ha escrito ningún control ALSA.",
             "Ningún preset autoriza aplicar controles sin certificar.",
+        ],
+    }
+
+
+def overview(store: PresetStore, backend, *, card_id: str | None = None) -> dict:
+    """One read-only hardware scan per ALSA card for all saved presets.
+
+    A matching preset is NOT proof of audible audio or an applied preset.
+    Errors are recorded per card and never cause a write or a false match.
+    """
+    if card_id is not None:
+        _string(card_id, "card_id", 64)
+    presets = [
+        entry
+        for entry in store.list()
+        if card_id is None or entry["card_id"] == card_id
+    ]
+    reports = {}
+    results = []
+    errors = []
+    for item in presets:
+        card = item["card_id"]
+        if card not in reports:
+            try:
+                reports[card] = scan_capabilities(backend, card=card)
+            except AlsaError as exc:
+                reports[card] = {
+                    "ok": False,
+                    "errors": [{"code": exc.code, "message": str(exc)}],
+                }
+        report = reports[card]
+        entry = {
+            "name": item["name"],
+            "description": item["description"],
+            "card_id": card,
+            "control_count": item["controls"],
+            "status": "unavailable",
+            "compatible": False,
+            "can_apply": False,
+            "summary": None,
+        }
+        if not report["ok"]:
+            issue = report["errors"][0] if report.get("errors") else {
+                "code": "inventory_incomplete",
+                "message": "El inventario ALSA no está completo.",
+            }
+            entry["error"] = issue
+            if not any(error["card_id"] == card for error in errors):
+                errors.append({"card_id": card, **issue})
+        else:
+            diff = compare_report(store.read(item["name"]), report)
+            entry["compatible"] = diff["compatible"]
+            entry["summary"] = diff["summary"]
+            if not item["controls"]:
+                entry["status"] = "empty"
+            elif not diff["compatible"]:
+                entry["status"] = "incompatible"
+            elif diff["summary"]["different"]:
+                entry["status"] = "different"
+            else:
+                entry["status"] = "matching"
+        results.append(entry)
+    return {
+        "schema_version": 1,
+        "scope": "alsa_preset_overview",
+        "ok": not errors,
+        "read_only": True,
+        "can_apply": False,
+        "presets": results,
+        "errors": errors,
+        "summary": {
+            "total": len(results),
+            "matching": sum(p["status"] == "matching" for p in results),
+            "different": sum(p["status"] == "different" for p in results),
+            "incompatible": sum(p["status"] == "incompatible" for p in results),
+            "unavailable": sum(p["status"] == "unavailable" for p in results),
+            "empty": sum(p["status"] == "empty" for p in results),
+            "scanned_cards": len(reports),
+        },
+        "notes": [
+            "Vista de solo lectura. Coincidir no significa que el audio sea audible.",
+            "No se ha seleccionado, cargado ni aplicado ningún preset.",
+            "La extensión GNOME no debe tratar matching como perfil activo.",
         ],
     }

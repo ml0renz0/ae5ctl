@@ -17,6 +17,7 @@ from ae5ctl.preset_store import (
     PresetStore,
     compare,
     new_preset,
+    overview,
     read_control,
     remove_control,
     set_control,
@@ -243,6 +244,8 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl presets create gaming --card Creative\n"
             "  ae5ctl presets capture music --card Creative --numid 11\n"
             "  ae5ctl presets set gaming --numid 11 --values 50,50\n"
+            "  ae5ctl presets overview --json\n"
+            "  ae5ctl presets duplicate gaming gaming-night\n"
             "  ae5ctl presets diff gaming --json\n"
             "  ae5ctl presets export gaming /tmp/gaming.json\n\n"
             "No hay aplicación de presets ni escrituras ALSA en esta fase.",
@@ -294,7 +297,9 @@ def parser() -> argparse.ArgumentParser:
             )
             for action, label in [
                 ("list", "listar los presets guardados"),
+                ("overview", "estado de todos los presets para la interfaz GNOME"),
                 ("show", "consultar un preset"),
+                ("duplicate", "duplicar un preset sin modificar el original"),
                 ("create", "crear un preset vacío"),
                 ("capture", "capturar controles elegidos explícitamente"),
                 ("set", "guardar el valor deseado de un control"),
@@ -305,8 +310,12 @@ def parser() -> argparse.ArgumentParser:
                 ("import", "importar un preset JSON validado"),
             ]:
                 task = tasks.add_parser(action, help=label)
-                if action not in {"list", "import"}:
+                if action not in {"list", "overview", "import"}:
                     task.add_argument("name", help="nombre del preset")
+                if action == "duplicate":
+                    task.add_argument("destination", help="nombre del nuevo preset")
+                if action == "overview":
+                    task.add_argument("--card", metavar="ID_ALSA")
                 if action == "import":
                     task.add_argument("path", type=Path)
                 if action == "export":
@@ -327,7 +336,7 @@ def parser() -> argparse.ArgumentParser:
                     task.add_argument("--control", required=True, metavar="NOMBRE")
                 if action in {"import", "export"}:
                     task.add_argument("--force", action="store_true")
-                if action in {"capture", "set", "diff"}:
+                if action in {"capture", "set", "diff", "overview"}:
                     task.add_argument("--timeout", type=positive_timeout, default=3.0)
                 task.add_argument("--json", action="store_true")
             continue
@@ -646,6 +655,11 @@ def presets_command(args: argparse.Namespace) -> int:
         action = args.preset_action
         if action == "list":
             output = {"schema_version": 1, "presets": store.list()}
+        elif action == "duplicate":
+            output = store.duplicate(args.name, args.destination)
+        elif action == "overview":
+            backend = AlsaBackend(timeout=args.timeout)
+            output = overview(store, backend, card_id=args.card)
         elif action == "show":
             output = store.read(args.name)
         elif action == "create":
@@ -708,6 +722,12 @@ def presets_command(args: argparse.Namespace) -> int:
             )
         if not output["presets"]:
             print("No hay presets guardados.")
+    elif action == "overview":
+        for preset in output["presets"]:
+            print(f"{preset['name']} [{preset['card_id']}]: {preset['status']}")
+        for error in output["errors"]:
+            print(f"Aviso ALSA [{error['card_id']}]: {error['message']}")
+        print("SOLO LECTURA: ningún preset ha sido aplicado.")
     elif action == "diff":
         print(f"Preset {output['preset']}: comparación ALSA de solo lectura")
         for control in output["controls"]:
@@ -721,6 +741,8 @@ def presets_command(args: argparse.Namespace) -> int:
             f"{len(output['controls'])} controles; solo configuración guardada."
         )
         print("No se ha aplicado ningún cambio al hardware.")
+    if action == "overview" and not output["ok"]:
+        return 4
     return 0
 
 

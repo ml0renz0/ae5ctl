@@ -66,9 +66,11 @@ que la tarjeta esté conectada.
 
 ```bash
 ae5ctl presets create gaming --card Creative
+ae5ctl presets duplicate gaming gaming-night
 ae5ctl presets capture music --card Creative --numid 11 --numid 43
 ae5ctl presets set gaming --numid 11 --values 50,50
 ae5ctl presets list
+ae5ctl presets overview --json     # Una lectura ALSA por tarjeta; para la GUI
 ae5ctl presets show gaming --json
 ae5ctl presets diff gaming --json
 ae5ctl presets remove gaming --control "Master Playback Volume"
@@ -83,6 +85,14 @@ Los nombres y los `numid` de los ejemplos son ilustrativos. Usa antes
 forma indiscriminada. `set` valida el valor deseado frente a los metadatos
 ALSA vigentes; `diff` coteja por identidad semántica, comprueba
 compatibilidad y muestra controles ausentes, distintos o restringidos.
+
+La vista `presets overview --json` es un contrato de lectura para la
+futura extensión GNOME: devuelve `matching`, `different`, `incompatible`,
+`unavailable` o `empty`. Consulta cada tarjeta una vez y nunca marca un
+preset como «activo»: un estado `matching` solo indica que sus valores
+coinciden con los controles observados, no que sea el perfil responsable
+del sonido o que la salida resulte audible. `duplicate` permite crear
+variaciones sin sobrescribir el original.
 
 **Ninguna orden `presets` aplica efectos, DSP, volumen o ganancia**.
 No existe `presets apply`; la certificación física del hardware sigue
