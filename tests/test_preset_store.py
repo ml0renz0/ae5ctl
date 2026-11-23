@@ -356,3 +356,130 @@ def test_presets_store_files_are_0600_even_with_permissive_umask(tmp_path):
     finally:
         os.umask(before)
     assert (store.root / "gaming.json").stat().st_mode & 0o777 == 0o600
+
+
+def test_duplicate_preserves_source_and_refuses_existing_destination(simulated, capsys):
+    store, _controls, calls = simulated
+    assert cli.main(["presets", "create", "gaming", "--card", "Creative"]) == 0
+    capsys.readouterr()
+    assert cli.main(["presets", "duplicate", "gaming", "gaming-night", "--json"]) == 0
+    duplicated = json.loads(capsys.readouterr().out)
+    assert duplicated["name"] == "gaming-night"
+    assert store.read("gaming")["name"] == "gaming"
+    assert store.read("gaming-night") == duplicated
+    assert cli.main(["presets", "duplicate", "gaming", "gaming-night", "--json"]) == 4
+    error = json.loads(capsys.readouterr().out)
+    assert error["error"]["code"] == "already_exists"
+    assert store.read("gaming-night") == duplicated
+    assert calls == []
+
+
+def test_overview_scans_each_card_once_and_keeps_read_only_contract(simulated, capsys):
+    store, _controls, calls = simulated
+    source = new_preset("gaming", "Creative")
+    entry = {
+        "identity": {
+            "iface": "MIXER",
+            "name": "Master Playback Volume",
+            "index": 0,
+            "device": 0,
+            "subdevice": 0,
+        },
+        "type": "INTEGER",
+        "values": ["40", "40"],
+    }
+    store.save(set_control(source, entry))
+    store.duplicate("gaming", "gaming-copy")
+    music = new_preset("music", "Creative")
+    music["controls"].append({**entry, "values": ["70", "70"]})
+    store.save(music)
+    store.save(new_preset("empty", "Creative"))
+    assert cli.main(["presets", "overview", "--json"]) == 0
+    response = json.loads(capsys.readouterr().out)
+    assert response["schema_version"] == 1
+    assert response["scope"] == "alsa_preset_overview"
+    assert response["ok"] is True
+    assert response["read_only"] is True
+    assert response["can_apply"] is False
+    assert response["summary"] == {
+        "total": 4, "matching": 2, "different": 1,
+        "incompatible": 0, "unavailable": 0, "empty": 1,
+        "scanned_cards": 1,
+    }
+    by_name = {item["name"]: item for item in response["presets"]}
+    assert by_name["gaming"]["status"] == "matching"
+    assert by_name["gaming-copy"]["status"] == "matching"
+    assert by_name["music"]["status"] == "different"
+    assert by_name["empty"]["status"] == "empty"
+    assert all(p["can_apply"] is False for p in response["presets"])
+    assert calls == [None]
+
+
+def test_overview_missing_controls_and_inventory_errors_are_distinct(simulated, capsys):
+    store, controls, calls = simulated
+    doc = new_preset("missing-control", "Creative")
+    doc["controls"].append({
+        "identity": {
+            "iface": "MIXER",
+            "name": "Missing Control",
+            "index": 0,
+            "device": 0,
+            "subdevice": 0,
+        },
+        "type": "INTEGER",
+        "values": ["20", "20"],
+    })
+    store.save(doc)
+    assert cli.main(["presets", "overview", "--json"]) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert first["presets"][0]["status"] == "incompatible"
+    assert first["presets"][0]["summary"]["unavailable"] == 1
+    assert first["ok"] is True
+    assert calls == [None]
+    controls.clear()
+    assert cli.main(["presets", "overview", "--json"]) == 0
+    second = json.loads(capsys.readouterr().out)
+    assert second["presets"][0]["status"] == "incompatible"
+    assert second["errors"] == []
+
+
+def test_overview_hardware_failure_propagates_per_card(monkeypatch, simulated, capsys):
+    store, _controls, _calls = simulated
+    store.save(new_preset("gaming", "Creative"))
+    store.save(new_preset("music", "Creative"))
+    from ae5ctl.alsa import AlsaError
+
+    reads = []
+
+    def unavailable(_backend, *, card, numid=None):
+        reads.append(card)
+        raise AlsaError("card_not_found", "La tarjeta no está conectada")
+
+    monkeypatch.setattr(presets, "scan_capabilities", unavailable)
+    assert cli.main(["presets", "overview", "--json"]) == 4
+    result = json.loads(capsys.readouterr().out)
+    assert reads == ["Creative"]
+    assert result["ok"] is False
+    assert result["summary"]["unavailable"] == 2
+    assert result["errors"][0]["code"] == "card_not_found"
+    assert all(p["status"] == "unavailable" for p in result["presets"])
+    assert all(p["can_apply"] is False for p in result["presets"])
+
+
+def test_overview_empty_store_does_not_probe_alsa(simulated, capsys):
+    _store, _controls, calls = simulated
+    assert cli.main(["presets", "overview", "--card", "Creative", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["summary"]["scanned_cards"] == 0
+    assert result["presets"] == []
+    assert calls == []
+
+
+def test_overview_card_filter_never_inspects_other_presets(simulated, capsys):
+    store, _controls, calls = simulated
+    store.save(new_preset("music", "Creative"))
+    store.save(new_preset("elsewhere", "AnotherCard"))
+    assert cli.main(["presets", "overview", "--card", "Creative", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert [p["name"] for p in result["presets"]] == ["music"]
+    assert calls == [None]
