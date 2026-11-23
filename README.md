@@ -56,6 +56,39 @@ cuando se puedan conservar controles leídos correctamente. Revisa nombres de
 dispositivos antes de compartir el JSON. Se conservarán la CLI y el `.deb`
 durante la transición hasta verificar la extensión GNOME en una AE-5 real.
 
+## Presets de usuario (fase 03)
+
+Los presets son archivos JSON versionados en
+`$XDG_CONFIG_HOME/ae5ctl/presets` (o `~/.config/ae5ctl/presets`).
+Contienen **solo los controles que selecciones**, con identificadores
+semánticos, no `numid` persistentes. Las operaciones de fichero no necesitan
+que la tarjeta esté conectada.
+
+```bash
+ae5ctl presets create gaming --card Creative
+ae5ctl presets capture music --card Creative --numid 11 --numid 43
+ae5ctl presets set gaming --numid 11 --values 50,50
+ae5ctl presets list
+ae5ctl presets show gaming --json
+ae5ctl presets diff gaming --json
+ae5ctl presets remove gaming --control "Master Playback Volume"
+ae5ctl presets export gaming ./gaming.json
+ae5ctl presets import ./gaming.json --force
+ae5ctl presets delete gaming
+```
+
+Los nombres y los `numid` de los ejemplos son ilustrativos. Usa antes
+`ae5ctl capabilities --json` para identificar los controles de tu equipo.
+`capture` requiere declarar cada control: nunca vuelca toda la tarjeta de
+forma indiscriminada. `set` valida el valor deseado frente a los metadatos
+ALSA vigentes; `diff` coteja por identidad semántica, comprueba
+compatibilidad y muestra controles ausentes, distintos o restringidos.
+
+**Ninguna orden `presets` aplica efectos, DSP, volumen o ganancia**.
+No existe `presets apply`; la certificación física del hardware sigue
+pendiente. `--force` solo permite sobrescribir el archivo de
+importación/exportación, no saltarse las restricciones de seguridad.
+
 ## Uso rápido
 
 La ayuda es autocontenida y no necesita hardware ni entorno gráfico:

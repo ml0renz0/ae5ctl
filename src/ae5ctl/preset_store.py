@@ -83,7 +83,7 @@ def validate(document):
         if _key(entry) in seen:
             raise PresetError("duplicate_control", "El preset repite un control.")
         seen.add(_key(entry))
-        if entry["type"] not in TYPES:
+        if type(entry["type"]) is not str or entry["type"] not in TYPES:
             raise PresetError("unsupported_type", "Tipo ALSA no compatible con presets.")
         values = entry["values"]
         if type(values) is not list or not 1 <= len(values) <= MAX_VALUES:
@@ -239,6 +239,8 @@ def read_control(backend, card_id, numid, desired=None):
     if not report["ok"]:
         error = report["errors"][0]
         raise AlsaError(error["code"], error["message"])
+    if len(report["controls"]) != 1:
+        raise PresetError("control_missing", "El control solicitado no está disponible.")
     if report["card"]["id"] != card_id:
         raise PresetError("card_mismatch", "Identidad de tarjeta inesperada.")
     control = report["controls"][0]

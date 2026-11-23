@@ -120,3 +120,22 @@ puede garantizarse ante desconexiones, fallo de permisos o interrupción severa.
 Toda esta fase se prueba únicamente contra ALSA simulado. La certificación de
 controles de hardware, la carga de aprobaciones y una UI de escritura continúan
 pendientes hasta disponer de evidencia y validación manual de la AE-5.
+
+
+## Fase 03 · presets versionados, gestión y diff (PR #4)
+
+Se incorpora `preset_store.py` y `ae5ctl presets` con `list`, `show`,
+`create`, `capture`, `set`, `remove`, `delete`, `export`, `import`
+y `diff`. El esquema v1 guarda ID ALSA de tarjeta, interfaz, nombre, índice,
+dispositivo, subdispositivo, tipo y valores por canal. No almacena numid,
+código ejecutable, comandos de shell ni permisos para escribir. Los nombres
+son identificadores ASCII acotados; archivos JSON limitados a 128 KiB y 64
+controles, lectura estricta y rechazo de claves desconocidas o duplicadas.
+Las operaciones de fichero usan escritura atómica y permisos 0600.
+
+La captura exige especificar los numid a consultar; no almacena
+automáticamente todas las opciones del hardware. Los enumerados se guardan
+como etiquetas semánticas y se resuelven contra las opciones actuales.
+`presets diff` compara identidades exactas, tipos, valores y restricciones
+contra ALSA, sin escribir. No existe `presets apply`; la aplicación con
+rollback y su certificación real sigue pendiente.

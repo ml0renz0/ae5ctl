@@ -12,6 +12,15 @@ from ae5ctl.alsa import AlsaBackend, AlsaError, Status, SwitchPlan, SwitchResult
 from ae5ctl.audio_session import inspect_audio_session
 from ae5ctl.capabilities import scan_capabilities
 from ae5ctl.control_plans import plan_control
+from ae5ctl.preset_store import (
+    PresetError,
+    PresetStore,
+    compare,
+    new_preset,
+    read_control,
+    remove_control,
+    set_control,
+)
 from ae5ctl.profiles import (
     HEADPHONES_FILE,
     SPEAKERS_FILE,
@@ -122,7 +131,9 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl doctor --pipewire    Inspección del servidor de audio\n"
             "  ae5ctl doctor --profiles    Incluye los perfiles ALSA guardados\n"
             "  ae5ctl capabilities --json  Descubre controles de la AE-5 (solo lectura)\n"
-            "  ae5ctl profiles diff        Compara perfiles alsactl guardados\n\n"
+            "  ae5ctl profiles diff        Compara perfiles alsactl guardados\n"
+            "  ae5ctl presets list         Presets JSON del usuario\n"
+            "  ae5ctl presets diff gaming  Compara preset con ALSA (solo lectura)\n\n"
             "La conmutación NO restaura perfiles de volumen, ganancia ni DSP.\n"
             "La lectura ALSA no garantiza que el audio sea audible.\n\n"
             "AYUDA DETALLADA\n"
@@ -226,6 +237,16 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl controls plan 43 Speakers --card Creative\n"
             "Todos los resultados son de solo lectura; no hay cset.",
         ),
+        "presets": (
+            "Gestiona presets JSON versionados por usuario, sin aplicarlos.",
+            "EJEMPLOS\n"
+            "  ae5ctl presets create gaming --card Creative\n"
+            "  ae5ctl presets capture music --card Creative --numid 11\n"
+            "  ae5ctl presets set gaming --numid 11 --values 50,50\n"
+            "  ae5ctl presets diff gaming --json\n"
+            "  ae5ctl presets export gaming /tmp/gaming.json\n\n"
+            "No hay aplicación de presets ni escrituras ALSA en esta fase.",
+        ),
         "profiles": (
             "Inspecciona los perfiles ALSA guardados; nunca ejecuta alsactl.",
             "EJEMPLOS\n"
@@ -251,6 +272,7 @@ def parser() -> argparse.ArgumentParser:
         ("doctor", "diagnosticar la lectura ALSA (sin reparar audio)"),
         ("capabilities", "inventariar controles ALSA de forma segura"),
         ("controls", "previsualizar valores tipados sin modificar ALSA"),
+        ("presets", "gestionar presets JSON de usuario sin aplicarlos"),
         ("switch", "seleccionar auriculares o altavoces"),
         ("toggle", "alternar la salida ALSA"),
         ("validate", "consultar o validar la salida AE-5"),
@@ -266,6 +288,51 @@ def parser() -> argparse.ArgumentParser:
             epilog=epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
+        if name == "presets":
+            tasks = command.add_subparsers(
+                dest="preset_action", required=True, metavar="ACCIÓN"
+            )
+            for action, label in [
+                ("list", "listar los presets guardados"),
+                ("show", "consultar un preset"),
+                ("create", "crear un preset vacío"),
+                ("capture", "capturar controles elegidos explícitamente"),
+                ("set", "guardar el valor deseado de un control"),
+                ("remove", "retirar un control del preset"),
+                ("delete", "borrar un preset"),
+                ("diff", "comparar valores con ALSA, sin escribir"),
+                ("export", "exportar un preset JSON"),
+                ("import", "importar un preset JSON validado"),
+            ]:
+                task = tasks.add_parser(action, help=label)
+                if action not in {"list", "import"}:
+                    task.add_argument("name", help="nombre del preset")
+                if action == "import":
+                    task.add_argument("path", type=Path)
+                if action == "export":
+                    task.add_argument("path", type=Path)
+                if action in {"create", "capture"}:
+                    task.add_argument("--card", required=True, metavar="ID_ALSA")
+                    task.add_argument("--description", default="")
+                if action in {"capture", "set"}:
+                    task.add_argument(
+                        "--numid",
+                        type=positive_int,
+                        action="append" if action == "capture" else "store",
+                        required=True,
+                    )
+                if action == "set":
+                    task.add_argument("--values", required=True, metavar="VALORES")
+                if action == "remove":
+                    task.add_argument("--control", required=True, metavar="NOMBRE")
+                if action in {"import", "export"}:
+                    task.add_argument("--force", action="store_true")
+                if action in {"capture", "set", "diff"}:
+                    task.add_argument(
+                        "--timeout", type=positive_timeout, default=3.0
+                    )
+                task.add_argument("--json", action="store_true")
+            continue
         if name == "controls":
             tasks = command.add_subparsers(
                 dest="control_action", required=True, metavar="ACCIÓN"
@@ -574,6 +641,95 @@ def doctor(backend: AlsaBackend, args: argparse.Namespace) -> int:
     return result
 
 
+def presets_command(args: argparse.Namespace) -> int:
+    """File operations do not instantiate the ALSA backend."""
+    store = PresetStore()
+    try:
+        action = args.preset_action
+        if action == "list":
+            output = {"schema_version": 1, "presets": store.list()}
+        elif action == "show":
+            output = store.read(args.name)
+        elif action == "create":
+            output = store.save(
+                new_preset(args.name, args.card, args.description)
+            )
+        elif action == "delete":
+            store.delete(args.name)
+            output = {"deleted": args.name}
+        elif action == "import":
+            output = store.import_file(args.path, overwrite=args.force)
+        elif action == "export":
+            store.export_file(args.name, args.path, overwrite=args.force)
+            output = {"exported": args.name, "path": str(args.path)}
+        elif action == "remove":
+            document = store.read(args.name)
+            output = store.save(
+                remove_control(document, args.control), overwrite=True
+            )
+        else:
+            document = None
+            if action in {"set", "diff"}:
+                document = store.read(args.name)
+            backend = AlsaBackend(timeout=args.timeout)
+            if action == "diff":
+                output = compare(document, backend)
+            elif action == "set":
+                entry = read_control(
+                    backend, document["card_id"], args.numid, args.values
+                )
+                output = store.save(set_control(document, entry), overwrite=True)
+            elif action == "capture":
+                if len(args.numid) != len(set(args.numid)):
+                    raise PresetError(
+                        "duplicate_control", "Se repite un numid en la captura."
+                    )
+                document = new_preset(args.name, args.card, args.description)
+                for number in args.numid:
+                    entry = read_control(backend, args.card, number)
+                    set_control(document, entry)
+                output = store.save(document)
+            else:
+                raise PresetError("invalid_action", "Acción de presets desconocida.")
+    except PresetError as error:
+        if args.json:
+            print_json({"error": {"code": error.code, "message": str(error)}})
+        else:
+            print(f"Error preset [{error.code}]: {error}", file=sys.stderr)
+        return 4
+    except AlsaError as error:
+        if args.json:
+            print_json({"error": error_dict(error)})
+        else:
+            print_error(error)
+        return exit_code(error)
+
+    if args.json:
+        print_json(output)
+    elif action == "list":
+        for preset in output["presets"]:
+            print(
+                f"{preset['name']} [{preset['card_id']}]: "
+                f"{preset['controls']} controles"
+            )
+        if not output["presets"]:
+            print("No hay presets guardados.")
+    elif action == "diff":
+        print(f"Preset {output['preset']}: comparación ALSA de solo lectura")
+        for control in output["controls"]:
+            print(f"  {control['identity']['name']}: {control['status']}")
+        print("NO se ha aplicado ningún control ni ajuste DSP.")
+    elif action in {"delete", "export"}:
+        print(f"Operación {action} completada: {args.name}.")
+    else:
+        print(
+            f"Preset {output['name']} [{output['card_id']}]: "
+            f"{len(output['controls'])} controles; solo configuración guardada."
+        )
+        print("No se ha aplicado ningún cambio al hardware.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     arguments = sys.argv[1:] if argv is None else argv
     if not arguments:
@@ -582,6 +738,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(arguments)
     if args.command == "profiles":
         return profiles_command(args)
+    if args.command == "presets":
+        return presets_command(args)
     if args.command == "tray":
         from ae5ctl.tray import run_tray
 
