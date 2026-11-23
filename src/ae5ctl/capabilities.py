@@ -17,6 +17,7 @@ MAX_CGET_CHARS = 32 * 1024
 _TYPE = re.compile(r"\btype=([A-Z][A-Z0-9_]*)\b")
 _ACCESS = re.compile(r"\baccess=([^,\s]+)")
 _VALUE_COUNT = re.compile(r"\bvalues=(\d+)\b")
+_ITEM_COUNT = re.compile(r"\bitems=(\d+)\b")
 _RANGE = re.compile(r"\b(min|max|step)=(-?\d+)\b")
 _INTERFACE = re.compile(r"(?:^|,)iface=([^,]+)")
 _ITEMS = re.compile(r"^\s*;\s*Item #(\d+) '(.*)'\s*$")
@@ -76,7 +77,7 @@ def parse_control_detail(text: str, expected_numid: int) -> dict:
     item_labels: dict[int, str] = {}
     selections: list[str] | None = None
     for line in lines[1:]:
-        item = _ITEM.match(line)
+        item = _ITEMS.match(line)
         value = _VALUES.match(line)
         if item:
             index = int(item[1])
@@ -92,7 +93,13 @@ def parse_control_detail(text: str, expected_numid: int) -> dict:
     if count is not None and count != len(selections):
         raise AlsaError("parse_error", "cget tiene un número de valores incoherente.")
     if control_type == "ENUMERATED":
-        if not item_labels or set(item_labels) != set(range(len(item_labels))):
+        count_items = _ITEM_COUNT.search(metadata[0])
+        if (
+            count_items is None
+            or int(count_items[1]) != len(item_labels)
+            or not item_labels
+            or set(item_labels) != set(range(len(item_labels)))
+        ):
             raise AlsaError("parse_error", "cget enumerado incompleto.")
         if any(
             not v.isdecimal() or int(v) not in item_labels for v in selections
