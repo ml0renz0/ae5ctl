@@ -19,6 +19,7 @@ def item(kind, values, *, minimum=0, maximum=100, step=0, items=None):
         "device": 0,
         "subdevice": 0,
         "type": kind,
+        "access": "rw------",
         "values": values,
         "items": items or {},
         "range": {"min": minimum, "max": maximum, "step": step},
