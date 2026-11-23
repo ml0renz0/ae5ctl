@@ -58,7 +58,8 @@ def normalize(control: dict, requested: str) -> list[str]:
                 output.append(part)
                 continue
             matches = [
-                index for index, label in items.items()
+                index
+                for index, label in items.items()
                 if label.casefold() == part.casefold()
             ]
             if len(matches) != 1:
@@ -67,7 +68,8 @@ def normalize(control: dict, requested: str) -> list[str]:
             output.append(matches[0])
         return output
     raise AlsaError(
-        "unsupported_type", f"Tipo de control {kind!r} no soportado por el plan.",
+        "unsupported_type",
+        f"Tipo de control {kind!r} no soportado por el plan.",
     )
 
 
@@ -88,8 +90,11 @@ def plan_control(
     current = control["values"]
     if control["type"] == "BOOLEAN":
         current = [
-            "on" if value.casefold() in {"1", "on", "true"} else
-            "off" if value.casefold() in {"0", "off", "false"} else value
+            "on"
+            if value.casefold() in {"1", "on", "true"}
+            else "off"
+            if value.casefold() in {"0", "off", "false"}
+            else value
             for value in current
         ]
     return {
