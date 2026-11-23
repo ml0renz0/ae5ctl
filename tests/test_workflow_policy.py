@@ -43,9 +43,10 @@ def test_workflow_builds_debian_only_when_explicitly_requested():
     assert "dist/*.deb" in deb
     assert "dist/*.deb.sha256" in deb
     assert "if-no-files-found: error" in deb
-    assert "Test install and removal on both Ubuntu versions" in deb.split(
-        "actions/upload-artifact@v4", 1
-    )[0]
+    assert (
+        "Test install and removal on both Ubuntu versions"
+        in deb.split("actions/upload-artifact@v4", 1)[0]
+    )
     assert "github.event_name == 'pull_request'" in deb
     assert "build-deb" in deb
     assert "actions/upload-artifact" not in publish
