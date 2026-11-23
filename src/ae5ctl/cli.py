@@ -10,6 +10,7 @@ from pathlib import Path
 from ae5ctl import __version__
 from ae5ctl.alsa import AlsaBackend, AlsaError, Status, SwitchPlan, SwitchResult
 from ae5ctl.audio_session import inspect_audio_session
+from ae5ctl.capabilities import scan_capabilities
 from ae5ctl.profiles import (
     HEADPHONES_FILE,
     SPEAKERS_FILE,
@@ -115,6 +116,7 @@ def parser() -> argparse.ArgumentParser:
             "  ae5ctl doctor --json        Diagnóstico ALSA estructurado\n"
             "  ae5ctl doctor --pipewire    Inspección del servidor de audio\n"
             "  ae5ctl doctor --profiles    Incluye los perfiles ALSA guardados\n"
+            "  ae5ctl capabilities --json  Descubre controles de la AE-5 (solo lectura)\n"
             "  ae5ctl profiles diff        Compara perfiles alsactl guardados\n\n"
             "La conmutación NO restaura perfiles de volumen, ganancia ni DSP.\n"
             "La lectura ALSA no garantiza que el audio sea audible.\n\n"
@@ -162,6 +164,16 @@ def parser() -> argparse.ArgumentParser:
             "--pipewire usa pactl (PipeWire o PulseAudio).\n"
             "--profiles compara los dos .state originales, si existen.\n"
             "Son lecturas opcionales; no modifican perfiles ni rutas.",
+        ),
+        "capabilities": (
+            "Inventaría todos los controles ALSA de una tarjeta sin escribir.",
+            "EJEMPLOS\n"
+            "  ae5ctl capabilities\n"
+            "  ae5ctl capabilities --json\n"
+            "  ae5ctl capabilities --card Creative --json\n"
+            "  ae5ctl capabilities --card Creative --numid 43 --json\n\n"
+            "Incluye tipo, rango, acceso y clasificación orientativa.\n"
+            "Ningún control queda autorizado para escritura con este inventario.",
         ),
         "switch": (
             "Selecciona auriculares o altavoces modificando solo el control ALSA.",
@@ -225,6 +237,7 @@ def parser() -> argparse.ArgumentParser:
         ("cards", "listar tarjetas ALSA y obtener sus ID"),
         ("status", "consultar la salida física seleccionada"),
         ("doctor", "diagnosticar la lectura ALSA (sin reparar audio)"),
+        ("capabilities", "inventariar controles ALSA de forma segura"),
         ("switch", "seleccionar auriculares o altavoces"),
         ("toggle", "alternar la salida ALSA"),
         ("validate", "consultar o validar la salida AE-5"),
@@ -282,7 +295,7 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument(
                 "--json", action="store_true", help="imprimir JSON para scripts"
             )
-        else:
+        if name == "tray":
             command.add_argument(
                 "--interval",
                 type=positive_int,
@@ -564,6 +577,23 @@ def main(argv: list[str] | None = None) -> int:
             from ae5ctl.validation import run_validation
 
             return run_validation(backend, card=args.card, numid=args.numid)
+        if args.command == "capabilities":
+            report = scan_capabilities(backend, card=args.card, numid=args.numid)
+            if args.json:
+                print_json(report)
+            else:
+                selected = report["card"]
+                print(f"Inventario ALSA: {selected['id']} — {selected['name']}")
+                for control in report["controls"]:
+                    print(
+                        f"  {control['numid']} · {control['name']} "
+                        f"[{control['type']}; {control['family']}; "
+                        f"{control['write_policy']}]"
+                    )
+                for error in report["errors"]:
+                    print(f"  Aviso [{error['numid']}]: {error['message']}")
+                print("SOLO LECTURA: ningún control habilitado para escritura.")
+            return 0 if report["ok"] else 4
         if args.command == "cards":
             cards = [asdict(card) for card in backend.cards()]
             if args.json:

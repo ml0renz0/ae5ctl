@@ -273,3 +273,12 @@ temporal de amplitud digital baja. Nunca cambia la salida predeterminada del
 servidor, ajusta volúmenes ni restaura perfiles. `validate --apply` comparte
 este flujo; `validate` sin flag sigue siendo de solo lectura. Los tests
 simulan ALSA, PipeWire y ejecución de audio; falta validación física y GUI.
+
+## Ampliación del proyecto: AE-5 Control Center
+
+El alcance acordado incluye perfiles ALSA y PipeWire, volumen y mixer,
+DSP SBX, ecualizador, grabación/micrófono, wizard gráfico y extensión GNOME.
+La fase inmediata es el inventario *read-only* versionado de controles
+(`ae5ctl capabilities`) sin activar escritura: la salida muestra capacidades
+reportadas por ALSA y clasificación orientativa, no compatibilidad certificada.
+Roadmap, gates y criterios de seguridad en `docs/roadmap-control-center.md`.

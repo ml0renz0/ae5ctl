@@ -20,6 +20,29 @@ Las fases 00 y 01 preparan documentación, pruebas, CI y diagnóstico de lectura
 reanudar Ubuntu: cambiar de estéreo a 5.1 y volver a estéreo desde Ajustes → Sonido
 recupera el audio, según lo observado por el usuario. Su causa sigue pendiente.
 
+## Centro de control AE-5: ampliación del alcance
+
+La hoja de ruta [Control Center](docs/roadmap-control-center.md) contempla
+controles DSP, EQ, mixer, grabación, presets, perfiles de PipeWire y extensión
+GNOME, con funciones restringidas (Direct Mode, OutFX, RGB, Scout Mode)
+sujetas a investigación y a pruebas en hardware real.
+
+`ae5ctl capabilities --json` es el primer paso: inspecciona únicamente
+la tarjeta ALSA seleccionada y registra el tipo, acceso anunciado por el driver,
+valores actuales, opciones y rangos de sus controles. El informe **no modifica
+audio y no autoriza escribir ningún control**. Las categorías inferidas por
+nombre son pistas para diseñar la UI, no pruebas de compatibilidad:
+
+```bash
+ae5ctl capabilities --json
+ae5ctl capabilities --card Creative --json
+```
+
+Las lecturas incompletas se identifican como tales y devuelven código 4, aun
+cuando se puedan conservar controles leídos correctamente. Revisa nombres de
+dispositivos antes de compartir el JSON. Se conservarán la CLI y el `.deb`
+durante la transición hasta verificar la extensión GNOME en una AE-5 real.
+
 ## Uso rápido
 
 La ayuda es autocontenida y no necesita hardware ni entorno gráfico:
@@ -53,6 +76,7 @@ ae5ctl wizard                        # Wizard: tonos, preguntas y restauración
 ae5ctl validate --apply              # Alias de ae5ctl wizard
 ae5ctl doctor --json
 ae5ctl doctor --pipewire --json  # Inspección opcional, solo lectura
+ae5ctl capabilities --json      # Descubrimiento de controles; nunca escribe
 ae5ctl doctor --profiles --json  # Diagnóstico + perfiles originales
 ae5ctl doctor --pipewire --profiles --json  # Informe combinado, solo lectura
 ae5ctl profiles diff --json       # Comparación sin escribir en ALSA
