@@ -160,7 +160,7 @@ Las PR ordinarias y los commits a `main` pasan lint y tests sin construir
 archivos `.deb`. Para activar la validación Debian de una PR, se aplica
 la etiqueta de GitHub `build-deb`; para publicar se envía una etiqueta Git
 de versión `v<version>` apuntando a un commit integrado en `main`.
-Ninguna etiqueta está aplicada a la PR #4.
+El empaquetado bajo demanda depende de la etiqueta de la PR y de su CI actual.
 
 El pytest habitual excluye las pruebas que generan paquetes. Para ejecutarlas
 expresamente: `python -m pytest -m package`. Los paquetes solo se conservan
