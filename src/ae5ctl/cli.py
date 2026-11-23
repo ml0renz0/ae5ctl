@@ -221,9 +221,9 @@ def parser() -> argparse.ArgumentParser:
         ),
         "controls": (
             "Previsualiza controles tipados sin escribir en ALSA.",
-            "EJEMPLOS\\n"
-            "  ae5ctl controls plan 11 40,40 --card Creative --json\\n"
-            "  ae5ctl controls plan 43 Speakers --card Creative\\n"
+            "EJEMPLOS\n"
+            "  ae5ctl controls plan 11 40,40 --card Creative --json\n"
+            "  ae5ctl controls plan 43 Speakers --card Creative\n"
             "Todos los resultados son de solo lectura; no hay cset.",
         ),
         "profiles": (

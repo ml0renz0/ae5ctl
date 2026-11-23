@@ -21,7 +21,7 @@ _ITEM_COUNT = re.compile(r"\bitems=(\d+)\b")
 _RANGE = re.compile(r"\b(min|max|step)=(-?\d+)\b")
 _INTERFACE = re.compile(r"(?:^|,)iface=([^,]+)")
 _COORDINATES = {
-    name: re.compile(rf"(?:^|,){name}=(\\d+)(?:,|$)")
+    name: re.compile(rf"(?:^|,){name}=(\d+)(?:,|$)")
     for name in ("index", "device", "subdevice")
 }
 _ITEMS = re.compile(r"^\s*;\s*Item #(\d+) '(.*)'\s*$")
