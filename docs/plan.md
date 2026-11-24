@@ -282,3 +282,10 @@ La fase inmediata es el inventario *read-only* versionado de controles
 (`ae5ctl capabilities`) sin activar escritura: la salida muestra capacidades
 reportadas por ALSA y clasificación orientativa, no compatibilidad certificada.
 Roadmap, gates y criterios de seguridad en `docs/roadmap-control-center.md`.
+
+## Cambio a GNOME Extensions (PR #4)
+
+La extensión GJS para GNOME 46 pasa a ser la vía de distribución principal.
+Se retira el pipeline Debian y la etiqueta de PR `build-deb`, reemplazándolos
+por el ZIP y `build-gnome`. El código Python antiguo sigue en el repositorio
+solo como referencia mientras se prueban hardware y UI reales.

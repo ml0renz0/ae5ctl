@@ -22,8 +22,8 @@ reproducibles, nunca asumiendo que un control del driver funciona en toda AE-5.
   gráficas independientes para mixer, DSP, EQ, diagnóstico y wizard.
   No bloquear el hilo de Shell; usar operaciones asíncronas y desconectar
   callbacks al deshabilitar. No duplicar reglas de seguridad entre GUI y CLI.
-- **Distribución:** ZIP de extensión, controlado por CI. La CLI y el Debian
-  existente siguen disponibles mientras se valida equivalencia funcional.
+- **Distribución:** ZIP de extensión, controlado por CI. La CLI Python permanece únicamente como referencia. El ZIP GNOME es la
+  distribución principal, sin empaquetado Debian.
 
 ## Fases con gates
 
@@ -154,3 +154,11 @@ reflejan en resultados individuales y un código de salida distinto de cero.
 `presets duplicate ORIGEN DESTINO` clona un preset validado sin sobrescribir
 su origen ni un destino existente. La futura UI debe usar este contrato sin
 inventar «perfiles activos» por coincidencia de valores.
+
+## Migración a GNOME Extensions
+
+La primera extensión nativa integra Quick Settings, un parser ALSA GJS y
+cambios físicos de auriculares/altavoces con verificación. La CI se ha
+migrado a ZIP GNOME (etiqueta de prueba `build-gnome` y releases `vX.Y.Z`).
+Se eliminaron los scripts y tests de empaquetado Debian. Los presets,
+DSP y wizard gráfico no están todavía disponibles en la extensión.

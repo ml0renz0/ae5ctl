@@ -1,3 +1,11 @@
+**Aviso:** el formato principal pasa a ser GNOME Extensions. Para probar
+la versión GJS consulta [la guía GNOME](gnome-extension.md).
+Los comandos CLI descritos más abajo son de la implementación anterior,
+conservada para contrastar el comportamiento; no son necesarios al
+instalar el ZIP.
+
+---
+
 # Validación física de ae5ctl en Ubuntu
 
 Esta es una **prueba manual**: el programa no puede medir si realmente sale
