@@ -1,0 +1,9 @@
+{
+  "uuid": "ae5ctl@ml0renz0.github.io",
+  "name": "ae5ctl · Sound Blaster AE-5",
+  "description": "Selector ALSA físico AE-5 integrado en Quick Settings. Los controles DSP permanecen bloqueados.",
+  "shell-version": [
+    "46"
+  ],
+  "url": "https://github.com/ml0renz0/ae5ctl"
+}
