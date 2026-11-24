@@ -30,7 +30,8 @@ export class Ae5Alsa {
         });
         proc.init(this._cancel);
         this._children.add(proc);
-        const timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 4, () => {
+        let timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 4, () => {
+            timeout = 0;
             proc.force_exit();
             return GLib.SOURCE_REMOVE;
         });
@@ -42,7 +43,8 @@ export class Ae5Alsa {
                 throw new Error('Respuesta ALSA demasiado grande');
             return stdout;
         } finally {
-            GLib.Source.remove(timeout);
+            if (timeout)
+                GLib.Source.remove(timeout);
             this._children.delete(proc);
         }
     }
