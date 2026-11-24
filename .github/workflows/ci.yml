@@ -1,41 +1,31 @@
-name: CI/CD
+name: CI — GNOME Extension
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ['v*']
   pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
-      - labeled
-      - unlabeled
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
   merge_group:
-    types:
-      - checks_requested
+    types: [checks_requested]
 
 permissions:
   contents: read
 
 concurrency:
-  group: cicd-${{ github.ref }}
+  group: ae5ctl-gnome-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
-  tests:
-    name: Python ${{ matrix.python-version }}
+  python:
+    name: Python ${{ matrix.python-version }} (legacy regression)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ['3.10', '3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,107 +35,73 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: requirements-dev.txt
-      - name: Install development tools
+      - name: Install regression tools
         run: python -m pip install -e . -r requirements-dev.txt
-      - name: Lint
-        run: python -m ruff check .
-      - name: Check formatting
+      - name: Lint and formatting
         run: |
-          python -m ruff format --diff .
+          python -m ruff check .
           python -m ruff format --check .
-      - name: Test without audio hardware or desktop
+      - name: Run Python regression tests
         run: python -m pytest
 
-  deb:
-    name: Debian package (opt-in)
-    needs: tests
-    if: >-
-      github.event_name == 'pull_request' &&
-      contains(github.event.pull_request.labels.*.name, 'build-deb')
+  gnome:
+    name: GNOME Shell 46 ZIP
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: requirements-dev.txt
-      - name: Install packaging test dependencies
-        run: python -m pip install -e . -r requirements-dev.txt
-      - name: Run package-only tests
-        run: python -m pytest -m package
-      - name: Build Debian archive and verify checksum
+          node-version: '22'
+      - name: Parse every GJS module
         shell: bash
         run: |
           set -euo pipefail
-          /usr/bin/python3 packaging/build_deb.py --revision 1
-          (cd dist && sha256sum -c ./*.deb.sha256)
-      - name: Test install and removal on both Ubuntu versions
-        shell: bash
-        run: |
-          set -euo pipefail
-          packages=(dist/*.deb)
-          [[ ${#packages[@]} -eq 1 && -f "${packages[0]}" ]]
-          for image in ubuntu:22.04 ubuntu:24.04; do
-            echo "::group::Smoke $image"
-            docker run --rm \
-              --mount "type=bind,src=$PWD/dist,dst=/packages,readonly" \
-              --mount "type=bind,src=$PWD/packaging/smoke_deb.sh,dst=/smoke_deb.sh,readonly" \
-              "$image" sh -ec \
-              'set -- /packages/*.deb; test "$#" -eq 1; sh /smoke_deb.sh "$1"'
-            echo "::endgroup::"
+          for file in gnome/ae5ctl@ml0renz0.github.io/*.js gnome/ae5ctl@ml0renz0.github.io/*.mjs; do
+            node --input-type=module --check < "$file"
           done
-
-      - name: Upload explicitly requested PR package (24-hour retention)
+      - name: Test ALSA parser without hardware
+        run: node --test tests/gnome/*.test.mjs
+      - name: Build and inspect extension ZIP
+        shell: bash
+        run: |
+          python3 tools/build_extension.py
+          unzip -t dist/ae5ctl@ml0renz0.github.io.shell-extension.zip
+      - name: Upload GNOME ZIP only on request (one-day retention)
+        if: >-
+          github.event_name == 'pull_request' &&
+          contains(github.event.pull_request.labels.*.name, 'build-gnome')
         uses: actions/upload-artifact@v4
         with:
-          name: ae5ctl-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            dist/*.deb
-            dist/*.deb.sha256
+          name: ae5ctl-gnome-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/ae5ctl@ml0renz0.github.io.shell-extension.zip
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
 
   required:
     name: CI required
-    needs: [tests, deb]
-    if: ${{ always() }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 2
+    if: always()
+    needs: [python, gnome]
+    runs-on: ubuntu-latest
     steps:
-      - name: Validate code and optional Debian checks
+      - name: Require both test suites
         shell: bash
         env:
-          TESTS_RESULT: ${{ needs.tests.result }}
-          DEB_RESULT: ${{ needs.deb.result }}
-          BUILD_DEB: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'build-deb') }}
+          PYTHON_RESULT: ${{ needs.python.result }}
+          GNOME_RESULT: ${{ needs.gnome.result }}
         run: |
           set -euo pipefail
-          if [[ "$TESTS_RESULT" != success ]]; then
-            echo "Python tests failed or did not run: $TESTS_RESULT" >&2
-            exit 1
-          fi
-          if [[ "$BUILD_DEB" == true ]]; then
-            if [[ "$DEB_RESULT" != success ]]; then
-              echo "Requested Debian packaging did not pass: $DEB_RESULT" >&2
-              exit 1
-            fi
-          elif [[ "$DEB_RESULT" != skipped ]]; then
-            echo "Unrequested Debian packaging unexpectedly ran: $DEB_RESULT" >&2
-            exit 1
-          fi
+          [[ "$PYTHON_RESULT" == success && "$GNOME_RESULT" == success ]]
 
   publish:
-    name: Sign and publish tagged release
+    name: Publish GNOME extension
     needs: [required]
-    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
@@ -153,103 +109,29 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: requirements-dev.txt
-      - name: Validate version tag and its ancestry on main
+      - name: Verify the tagged commit belongs to main
         shell: bash
         run: |
           set -euo pipefail
-          version=$(python -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')
-          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
-            echo "Tag must match the pyproject.toml version: v$version" >&2
-            exit 1
-          fi
-          git fetch --no-tags origin main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo 'Release tags must point to commits already on main.' >&2
-            exit 1
-          fi
-      - name: Install packaging test dependencies
-        run: python -m pip install -e . -r requirements-dev.txt
-      - name: Run package-only tests
-        run: python -m pytest -m package
-      - name: Build and verify the tagged Debian package
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Build extension and checksum
         shell: bash
         run: |
           set -euo pipefail
-          /usr/bin/python3 packaging/build_deb.py --revision 1
-          (cd dist && sha256sum -c ./*.deb.sha256)
-      - name: Test install and removal on both Ubuntu versions
-        shell: bash
-        run: |
-          set -euo pipefail
-          packages=(dist/*.deb)
-          [[ ${#packages[@]} -eq 1 && -f "${packages[0]}" ]]
-          for image in ubuntu:22.04 ubuntu:24.04; do
-            echo "::group::Smoke $image"
-            docker run --rm \
-              --mount "type=bind,src=$PWD/dist,dst=/packages,readonly" \
-              --mount "type=bind,src=$PWD/packaging/smoke_deb.sh,dst=/smoke_deb.sh,readonly" \
-              "$image" sh -ec \
-              'set -- /packages/*.deb; test "$#" -eq 1; sh /smoke_deb.sh "$1"'
-            echo "::endgroup::"
-          done
-      - name: Sign and verify the tested package with OpenSSL
-        shell: bash
-        env:
-          DEB_SIGNING_KEY: ${{ secrets.DEB_SIGNING_KEY }}
-          DEB_SIGNING_PASSWORD: ${{ secrets.DEB_SIGNING_PASSWORD }}
-        run: |
-          set -euo pipefail
-          if [[ -z "$DEB_SIGNING_KEY" || -z "$DEB_SIGNING_PASSWORD" ]]; then
-            echo 'Missing DEB_SIGNING_KEY or DEB_SIGNING_PASSWORD repository secret.' >&2
-            exit 1
-          fi
-          (cd dist && sha256sum -c ./*.deb.sha256)
-          packages=(dist/*.deb)
-          [[ ${#packages[@]} -eq 1 && -f "${packages[0]}" ]]
-          umask 077
-          signing_dir=$(mktemp -d "$RUNNER_TEMP/ae5ctl-signing.XXXXXX")
-          trap 'rm -rf -- "$signing_dir"' EXIT
-          printf '%s' "$DEB_SIGNING_KEY" > "$signing_dir/private.pem"
-          printf '%s' "$DEB_SIGNING_PASSWORD" > "$signing_dir/password"
-          unset DEB_SIGNING_KEY DEB_SIGNING_PASSWORD
-          /usr/bin/python3 packaging/sign_deb.py "${packages[0]}" \
-            --key "$signing_dir/private.pem" \
-            --passphrase-file "$signing_dir/password" \
-            --public-key-output dist/signing-public.pem
-      - name: Publish only after every signed asset has been uploaded
+          python3 tools/build_extension.py
+          (cd dist && sha256sum *.shell-extension.zip > SHA256SUMS)
+          (cd dist && sha256sum -c SHA256SUMS)
+          unzip -t dist/*.shell-extension.zip
+      - name: Publish the tagged ZIP to GitHub Releases
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          packages=(dist/*.deb)
-          [[ ${#packages[@]} -eq 1 && -f "${packages[0]}" ]]
-          package=${packages[0]}
-          version=$(dpkg-deb --field "$package" Version)
-          tag="$GITHUB_REF_NAME"
-          notes="$RUNNER_TEMP/ae5ctl-release-notes.md"
-          printf 'Tagged release of commit `%s`.\n\n' "$GITHUB_SHA" > "$notes"
-          printf 'Includes the tested Debian package, SHA-256 checksum, OpenSSL signature and public key.\n' >> "$notes"
-          gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" --title "ae5ctl $version" \
-            --notes-file "$notes" --draft --prerelease
-          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" \
-            "$package" "$package.sha256" "$package.sig" dist/signing-public.pem
-          download_dir=$(mktemp -d "$RUNNER_TEMP/ae5ctl-download.XXXXXX")
-          trap 'rm -rf -- "$download_dir"' EXIT
-          gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
-            --dir "$download_dir"
-          for asset in "$package" "$package.sha256" "$package.sig" dist/signing-public.pem; do
-            cmp -- "$asset" "$download_dir/${asset##*/}"
-          done
-          (cd "$download_dir" && sha256sum -c ./*.deb.sha256)
-          openssl dgst -sha256 -verify "$download_dir/signing-public.pem" \
-            -signature "$download_dir/${package##*/}.sig" \
-            "$download_dir/${package##*/}"
-          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
-            --draft=false --prerelease --latest=false
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "ae5ctl GNOME $GITHUB_REF_NAME" \
+            --notes "GNOME Shell 46 extension (ZIP)." \
+            --prerelease --latest=false \
+            dist/*.shell-extension.zip dist/SHA256SUMS
