@@ -347,3 +347,189 @@ def test_wrong_control_returned_by_amixer_is_not_accepted(make_backend):
 def test_invalid_timeouts_are_rejected(timeout):
     with pytest.raises(ValueError):
         AlsaBackend(timeout=timeout, runner=Mock())
+
+
+def test_switch_updates_only_selected_enum_and_verifies(make_backend):
+    selected = {"value": 2}
+
+    def respond(command, **kwargs):
+        op = tuple(command[3:])
+        if op == ("controls",):
+            output = CONTROL_LIST
+        elif op == ("cget", "numid=11"):
+            output = INTEGER
+        elif op == ("cget", "numid=43"):
+            output = enum_response(values=str(selected["value"]))
+        elif op == ("cset", "numid=43", "1"):
+            selected["value"] = 1
+            output = enum_response(values="1")
+        else:
+            raise AssertionError(f"Unexpected ALSA command: {command}")
+        return subprocess.CompletedProcess(command, 0, output, "")
+
+    backend, runner = make_backend(runner=Mock(side_effect=respond))
+    result = backend.switch("speakers")
+
+    assert result.before.output == "headphones"
+    assert result.after.output == "speakers"
+    assert result.changed is True
+    write = ["amixer", "-c", "7", "cset", "numid=43", "1"]
+    assert sum(call.args[0] == write for call in runner.call_args_list) == 1
+    assert runner.call_args.args[0] == ["amixer", "-c", "7", "cget", "numid=43"]
+    assert all(call.kwargs["shell"] is False for call in runner.call_args_list)
+
+
+def test_switch_is_idempotent_without_writing(make_backend):
+    backend, runner = make_backend()
+    result = backend.switch("headphones")
+
+    assert result.changed is False
+    assert result.after == result.before
+    assert all("cset" not in call.args[0] for call in runner.call_args_list)
+
+
+def test_toggle_uses_live_state_for_each_invocation(make_backend):
+    selected = {"value": 2}
+
+    def respond(command, **kwargs):
+        op = tuple(command[3:])
+        if op == ("controls",):
+            output = CONTROL_LIST
+        elif op == ("cget", "numid=11"):
+            output = INTEGER
+        elif op == ("cget", "numid=43"):
+            output = enum_response(values=str(selected["value"]))
+        elif op in (("cset", "numid=43", "1"), ("cset", "numid=43", "2")):
+            selected["value"] = int(op[-1])
+            output = enum_response(values=str(selected["value"]))
+        else:
+            raise AssertionError(f"Unexpected ALSA command: {command}")
+        return subprocess.CompletedProcess(command, 0, output, "")
+
+    backend, runner = make_backend(runner=Mock(side_effect=respond))
+    assert backend.toggle().after.output == "speakers"
+    assert backend.toggle().after.output == "headphones"
+    assert selected["value"] == 2
+    writes = [
+        call.args[0][-1] for call in runner.call_args_list if "cset" in call.args[0]
+    ]
+    assert writes == ["1", "2"]
+
+
+def test_ambiguous_target_is_rejected_without_writing(make_backend):
+    backend, runner = make_backend(
+        responses={
+            ("cget", "numid=43"): enum_response(
+                values="2",
+                options={0: "Speaker", 1: "Speakers", 2: "Headphones"},
+            )
+        }
+    )
+
+    assert_code("ambiguous_output", lambda: backend.switch("speakers", numid=43))
+    assert all("cset" not in call.args[0] for call in runner.call_args_list)
+
+
+def test_failure_during_write_is_reported(make_backend):
+    def respond(command, **kwargs):
+        op = tuple(command[3:])
+        if op == ("cget", "numid=43"):
+            return subprocess.CompletedProcess(command, 0, enum_response(), "")
+        if op == ("cset", "numid=43", "1"):
+            return subprocess.CompletedProcess(command, 1, "", "Permission denied")
+        raise AssertionError(f"Unexpected ALSA command: {command}")
+
+    backend, runner = make_backend(runner=Mock(side_effect=respond))
+    assert_code("command_failed", lambda: backend.switch("speakers", numid=43))
+    assert runner.call_args.args[0][-3:] == ["cset", "numid=43", "1"]
+
+
+def test_unverified_write_returns_error_instead_of_success(make_backend):
+    def respond(command, **kwargs):
+        op = tuple(command[3:])
+        if op == ("cget", "numid=43"):
+            output = enum_response()
+        elif op == ("cset", "numid=43", "1"):
+            output = enum_response()
+        else:
+            raise AssertionError(f"Unexpected ALSA command: {command}")
+        return subprocess.CompletedProcess(command, 0, output, "")
+
+    backend, runner = make_backend(runner=Mock(side_effect=respond))
+    assert_code("verify_failed", lambda: backend.switch("speakers", numid=43))
+    assert runner.call_args.args[0][-2:] == ["cget", "numid=43"]
+
+
+def test_invalid_output_is_rejected_without_alsa(make_backend):
+    backend, runner = make_backend()
+    with pytest.raises(ValueError, match="headphones"):
+        backend.switch("auto")
+    runner.assert_not_called()
+
+
+def test_prewrite_guard_rejects_external_state_change(make_backend):
+    """Another application wins the race; no stale ALSA write is attempted."""
+    reads = {"count": 0}
+
+    def respond(command, **_kwargs):
+        operation = tuple(command[3:])
+        if operation == ("cget", "numid=43"):
+            reads["count"] += 1
+            output = enum_response(values="2" if reads["count"] == 1 else "1")
+            return subprocess.CompletedProcess(command, 0, output, "")
+        raise AssertionError(f"Stale operation unexpectedly wrote ALSA: {command}")
+
+    backend, runner = make_backend(runner=Mock(side_effect=respond))
+    assert_code("state_changed", lambda: backend.switch("speakers", numid=43))
+    assert reads["count"] == 2
+    assert all("cset" not in call.args[0] for call in runner.call_args_list)
+
+
+def test_prewrite_guard_rejects_reassigned_enum_at_same_numid(make_backend):
+    """A driver reload must not retarget an old numeric control silently."""
+    reads = {"count": 0}
+
+    def respond(command, **_kwargs):
+        operation = tuple(command[3:])
+        if operation == ("cget", "numid=43"):
+            reads["count"] += 1
+            if reads["count"] == 1:
+                output = enum_response(values="2")
+            else:
+                output = enum_response(
+                    values="2",
+                    options={0: "Auto", 1: "Headphones", 2: "Speakers"},
+                )
+            return subprocess.CompletedProcess(command, 0, output, "")
+        raise AssertionError(f"Reassigned enum unexpectedly wrote ALSA: {command}")
+
+    backend, runner = make_backend(runner=Mock(side_effect=respond))
+    assert_code("control_changed", lambda: backend.switch("speakers", numid=43))
+    assert reads["count"] == 2
+    assert all("cset" not in call.args[0] for call in runner.call_args_list)
+
+
+def test_readback_rejects_reassigned_enum_even_if_target_matches(make_backend):
+    """The readback must confirm the same control, not merely a matching label."""
+    reads = {"count": 0}
+
+    def respond(command, **_kwargs):
+        operation = tuple(command[3:])
+        if operation == ("cget", "numid=43"):
+            reads["count"] += 1
+            if reads["count"] < 3:
+                output = enum_response(values="2")
+            else:
+                output = enum_response(
+                    values="1", options={0: "Auto", 1: "Speakers", 2: "Headphones"}
+                )
+        elif operation == ("cset", "numid=43", "1"):
+            output = enum_response(values="1")
+        else:
+            raise AssertionError(f"Unexpected ALSA command: {command}")
+        return subprocess.CompletedProcess(command, 0, output, "")
+
+    backend, runner = make_backend(runner=Mock(side_effect=respond))
+    assert_code("verify_failed", lambda: backend.switch("speakers", numid=43))
+    assert reads["count"] == 3
+    assert sum("cset" in call.args[0] for call in runner.call_args_list) == 1

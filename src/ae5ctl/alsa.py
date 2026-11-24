@@ -39,6 +39,21 @@ class Status:
     output: str
 
 
+@dataclass(frozen=True)
+class SwitchResult:
+    before: Status
+    after: Status
+    changed: bool
+
+
+@dataclass(frozen=True)
+class SwitchPlan:
+    before: Status
+    target: str
+    item_index: int
+    changed: bool
+
+
 _CARD = re.compile(r"^\s*(\d+)\s+\[([^\]]+)\]\s*:\s*(.+)$")
 _CARD_START = re.compile(r"^\s*\d+\s+\[")
 _AE5 = re.compile(r"(?<![a-z0-9])ae[- ]?5(?![a-z0-9])", re.IGNORECASE)
@@ -147,7 +162,7 @@ def _supports_outputs(control: EnumControl) -> bool:
 
 
 class AlsaBackend:
-    """Read-only operations: controls and cget; never restore or cset."""
+    """Scoped ALSA reads and verified output-selector writes."""
 
     def __init__(
         self,
@@ -200,7 +215,7 @@ class AlsaBackend:
             )
         return matches[0]
 
-    def _read(self, card: Card, *arguments: str) -> str:
+    def _run(self, card: Card, *arguments: str) -> str:
         command = ["amixer", "-c", str(card.index), *arguments]
         try:
             result = self.runner(
@@ -219,7 +234,7 @@ class AlsaBackend:
             ) from error
         except subprocess.TimeoutExpired as error:
             raise AlsaError(
-                "command_timeout", "La consulta ALSA superó el tiempo límite."
+                "command_timeout", "La operación ALSA superó el tiempo límite."
             ) from error
         except OSError as error:
             raise AlsaError(
@@ -231,6 +246,9 @@ class AlsaBackend:
                 "command_failed", f"amixer falló ({result.returncode}): {detail}"
             )
         return result.stdout
+
+    def _read(self, card: Card, *arguments: str) -> str:
+        return self._run(card, *arguments)
 
     def _control(self, card: Card, numid: int) -> EnumControl:
         text = self._read(card, "cget", f"numid={numid}")
@@ -293,3 +311,114 @@ class AlsaBackend:
                 "unknown_output", "La salida seleccionada no se puede interpretar."
             )
         return Status(selected, control, output)
+
+    @staticmethod
+    def _plan(before: Status, target: str) -> SwitchPlan:
+        """Compute the ALSA enum item without modifying hardware."""
+        if target not in {"headphones", "speakers"}:
+            raise ValueError("La salida debe ser headphones o speakers.")
+        if before.output == target:
+            return SwitchPlan(
+                before=before,
+                target=target,
+                item_index=before.control.values[0],
+                changed=False,
+            )
+        matches = [
+            index
+            for index, label in before.control.items.items()
+            if _output(label) == target
+        ]
+        if len(matches) != 1:
+            raise AlsaError(
+                "ambiguous_output",
+                "La salida solicitada no tiene una opción ALSA única.",
+            )
+        return SwitchPlan(
+            before=before, target=target, item_index=matches[0], changed=True
+        )
+
+    def plan_switch(
+        self, output: str, card: str | None = None, numid: int | None = None
+    ) -> SwitchPlan:
+        """Inspect exactly the enum change switch would perform, without cset."""
+        if output not in {"headphones", "speakers"}:
+            raise ValueError("La salida debe ser headphones o speakers.")
+        return self._plan(self.status(card=card, numid=numid), output)
+
+    def plan_toggle(
+        self, card: str | None = None, numid: int | None = None
+    ) -> SwitchPlan:
+        """Determine the opposite of the live ALSA selection without writing."""
+        before = self.status(card=card, numid=numid)
+        target = "speakers" if before.output == "headphones" else "headphones"
+        return self._plan(before, target)
+
+    def _change(self, before: Status, target: str) -> SwitchResult:
+        """Write the planned ALSA enum, guarding card identity and readback."""
+        plan = self._plan(before, target)
+        if not plan.changed:
+            return SwitchResult(before=before, after=before, changed=False)
+        # A hotplug or driver reset may reuse the numeric index. Never write
+        # the old control to a different card even if its index is identical.
+        if before.card not in self.cards():
+            raise AlsaError(
+                "card_changed",
+                "La identidad de la tarjeta ALSA cambió antes de escribir. "
+                "Ejecute ae5ctl cards y repita la consulta.",
+            )
+        # Re-read immediately before writing: another client or a driver reset
+        # may have changed the selected value or reassigned this numid.
+        current = self._control(before.card, before.control.numid)
+        if current.name != before.control.name or current.items != before.control.items:
+            raise AlsaError(
+                "control_changed",
+                "El control ALSA cambió después de la lectura inicial. "
+                "Consulte ae5ctl status y vuelva a intentarlo.",
+            )
+        if current.values != before.control.values:
+            raise AlsaError(
+                "state_changed",
+                "La salida ALSA cambió durante la operación. "
+                "No se ha escrito ningún cambio; consulte ae5ctl status.",
+            )
+        self._run(
+            before.card,
+            "cset",
+            f"numid={before.control.numid}",
+            str(plan.item_index),
+        )
+        try:
+            control = self._control(before.card, before.control.numid)
+        except AlsaError as exc:
+            raise AlsaError(
+                "verify_failed",
+                f"El cambio se envió, pero no se pudo verificar: {exc}. "
+                "Consulte ae5ctl status antes de volver a intentarlo.",
+            ) from exc
+        if (
+            control.name != before.control.name
+            or control.items != before.control.items
+            or len(control.values) != 1
+            or _output(control.items.get(control.values[0], "")) != target
+        ):
+            raise AlsaError(
+                "verify_failed",
+                "El cambio se envió, pero ALSA no confirmó la salida solicitada.",
+            )
+        after = Status(card=before.card, control=control, output=target)
+        return SwitchResult(before=before, after=after, changed=True)
+
+    def switch(
+        self, output: str, card: str | None = None, numid: int | None = None
+    ) -> SwitchResult:
+        """Select an ALSA output without restoring mixer profiles."""
+        if output not in {"headphones", "speakers"}:
+            raise ValueError("La salida debe ser headphones o speakers.")
+        return self._change(self.status(card=card, numid=numid), output)
+
+    def toggle(self, card: str | None = None, numid: int | None = None) -> SwitchResult:
+        """Toggle from live ALSA state, never a remembered marker."""
+        before = self.status(card=card, numid=numid)
+        target = "speakers" if before.output == "headphones" else "headphones"
+        return self._change(before, target)

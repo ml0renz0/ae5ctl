@@ -17,15 +17,27 @@ deja de funcionar correctamente y se recupera al cambiar estéreo → 5.1 → es
 en Ajustes → Sonido. Este síntoma no determina si el fallo está en ALSA, el
 controlador, PipeWire, PulseAudio o el gestor de sesión.
 
+## Decisión de arquitectura (noviembre de 2026)
+
+Se mantiene ALSA para los controles físicos específicos de Creative y se prevé
+incorporar PipeWire/WirePlumber para observar perfiles, puertos y rutas. No se
+cambiará el backend a PipeWire sin comprobar primero qué capa controla realmente
+el selector de la AE-5. La CLI de lectura seguirá funcionando sin escritorio.
+
+La incidencia de suspensión documentada ocurrió antes de una actualización de
+Ubuntu. Tras actualizar, el usuario todavía no ha observado que se reproduzca.
+Por tanto no se implementa recuperación automática ni se prioriza su investigación:
+el procedimiento de capturas posterior solo se activará si reaparece el fallo.
+
 ## Fases
 
 | Fase | Trabajo | Evidencia para completarla |
 | --- | --- | --- |
 | 00 · Base | Preservar el original, documentar el alcance, preparar herramientas, tests y CI. | Las pruebas se ejecutan sin GTK ni hardware; el original permanece intacto y los defectos conocidos quedan explícitos. |
 | 01 · Lectura ALSA y diagnóstico | Separar la lectura del estado de la interfaz, interpretar enumerados, seleccionar la tarjeta sin ambigüedad y ofrecer una CLI mínima de consulta. | Tests de controles, errores y tarjeta ausente; contraste temprano con salidas reales de la AE-5. |
-| 02 · Suspensión | Comparar el audio antes de suspender, tras el fallo y después de recuperarlo desde los ajustes de Ubuntu. | Diferencias reproducibles, registros relevantes y una hipótesis comprobada o límites de la investigación documentados. |
-| 03 · Conmutación y perfiles | Implementar `switch` y `toggle`, acotar comandos a la tarjeta seleccionada y comparar los perfiles existentes antes de decidir el modo predeterminado. | Errores y tiempos límite controlados, verificación posterior de la selección y pruebas con hardware sin alterar otras tarjetas. |
-| 04 · Bandeja | Conectar la interfaz al motor, adaptar el indicador a Ayatana y evitar bloqueos de la sesión gráfica. | Comprobación gráfica, errores visibles y actualización de estado coherente con la CLI. |
+| 02 · Suspensión (condicional) | Investigar únicamente si vuelve a reproducirse tras la actualización de Ubuntu. | Capturas comparables antes del fallo, durante él y tras recuperarlo; no introducir hooks especulativos. |
+| 03 · Conmutación y perfiles | Conmutación ALSA directa y comparador de ficheros `.state` implementados en PR #4; falta ejecutarlo con perfiles reales y validar en hardware físico. | Determinar controles adicionales necesarios, sin modificar otras tarjetas, antes de sustituir el programa original. |
+| 04 · Bandeja | Implementada bandeja GTK3/Ayatana opcional y asíncrona en PR #4; falta validación en una sesión GNOME real. | Comprobar iconos, menú y estado tras cambios externos sin bloquear el escritorio. |
 | 05 · Instalación y validación | Documentar instalación, uso y recuperación; añadir distribución y arranque automático cuando el flujo sea fiable. | Comprobación en Ubuntu con auriculares, altavoces y varios ciclos de suspensión; límites conocidos documentados antes de publicar. |
 
 La validación con hardware empieza en la fase 01 y continúa en cada cambio de
@@ -33,21 +45,94 @@ comportamiento. No se pospone íntegramente a una release final.
 
 El flujo de integración es TBD: ramas cortas y PR hacia `main`, con revisión y
 el check `CI required` antes de fusionar. No se hace push directo a `main`.
-La publicación automática ocurre después de integrar, desde `main`.
+La publicación ocurre únicamente al enviar una etiqueta Git de versión `v*` sobre un commit integrado en `main`.
 
-Se reutiliza la rama `codex/ae5ctl-deb-signing`, partiendo de `main` para cada
-PR. Tras fusionar se elimina la rama remota; el borrado comprueba que su punta
-sigue siendo la integrada para conservar cualquier trabajo posterior.
+La PR de desarrollo actual se mantiene en `feat/cli-ux-help`. No se crean ni se
+eliminan etiquetas de release al fusionar; el empaquetado se ejecuta solo con
+etiqueta de PR `build-deb` o etiqueta Git de versión.
 
 ## Empaquetado adelantado
 
 A petición del usuario, se adelanta de la fase 05 la generación de paquetes
 `.deb` de la CLI actual, su firma con una clave OpenSSL cifrada y su publicación
-automática mediante CI/CD tras superar las comprobaciones de `main`. Las
+solo bajo demanda: etiqueta de PR `build-deb` para validar y etiqueta Git
+`v<version>` después de fusionar en `main` para publicar. Las
 instrucciones están en [Paquetes .deb y firma OpenSSL](deb-packages.md). Esto no
 añade funcionalidades de audio ni resuelve la suspensión. Las compilaciones se
 publican como prereleases; la elección de licencia, la validación con hardware y
 un posible repositorio APT siguen pendientes.
+
+## Usabilidad de CLI (PR de seguimiento)
+
+Se añade ayuda general y por subcomando con ejemplos, versión, códigos de salida,
+advertencias sobre los comandos que escriben en ALSA y sugerencias en errores. El formato JSON
+y sus códigos de salida permanecen estables; las pruebas verifican el contenido
+de la ayuda sin acceder a ALSA. Tras esta mejora, la siguiente prioridad funcional
+es implementar la conmutación de salidas, con validación en hardware.
+
+## Comparador de instantáneas alsactl (PR #4)
+
+`ae5ctl profiles diff` lee los dos ficheros `.state` del programa original
+sin ejecutar comandos ni acceder al hardware. Un parser delimitado y estricto
+reconoce bloques `state.*` y `control.*`, compara valores por identidad
+de control y advierte de cambios potenciales de volumen, muteo o DSP.
+Los números `control.N` no son identidad estable. Se muestran controles
+y tarjetas ausentes en uno de los perfiles, incluidas otras tarjetas
+restaurables por `alsactl`. La clasificación por nombre es orientativa.
+El parser rechaza entrada que no sabe interpretar, con tamaño máximo de 2 MiB.
+La validez de la comparación en los dos archivos *reales* sigue pendiente;
+no se guarda ni restaura el estado del audio.
+
+## Inspección opcional del servidor de audio (PR #4)
+
+`ae5ctl doctor --pipewire` consulta únicamente `pactl info`,
+`pactl list short sinks` y `pactl list short cards`. Identifica si responde
+PipeWire a través de su capa compatible con PulseAudio, PulseAudio nativo u
+otro servidor. Informa de la salida predeterminada y dispositivos anunciados,
+sin deducir qué conector físico de la AE-5 utilizan. La ausencia de `pactl`
+es una advertencia opcional y no convierte una lectura ALSA correcta en fallo.
+No se modifica el audio ni se consulta todavía el grafo nativo de WirePlumber.
+
+## Bandeja GTK/Ayatana opcional (PR #4)
+
+El subcomando `ae5ctl tray` usa el motor ALSA existente con un controlador
+asíncrono de una operación a la vez; GLib actualiza los controles en el hilo
+principal. Las dependencias gráficas se importan únicamente al arrancar `tray`,
+de modo que las otras órdenes y CI continúan funcionando sin GTK. No hay
+autostart ni restauración de perfiles. Pendiente probar el indicador y el
+control de la tarjeta real en Ubuntu GNOME.
+
+## Robustez de la bandeja (PR #4)
+
+La lógica visual se calcula mediante una función pura que deshabilita las
+operaciones de escritura cuando el estado es desconocido, hay error o se
+ejecuta una consulta. El refresco manual sigue disponible después de fallos.
+Una petición que todavía no ha arrancado queda descartada si se cierra el
+indicador; los callbacks de operaciones ya iniciadas no actualizan una UI
+cerrada. Si se seleccionó la tarjeta por índice numérico, se conserva su
+identificador ALSA real para impedir cambios accidentales de dispositivo
+después de una desconexión. Las pruebas se ejecutan sin GTK ni hardware.
+
+## Previsualización y protección de cambios ALSA (PR #4)
+
+`ae5ctl switch speakers --dry-run` y `ae5ctl toggle --dry-run` muestran
+el índice enumerado y comando `amixer cset` previsto, sin ejecutar cambios.
+El motor comparte la misma selección del control entre previsualización y
+escritura, comprueba que la tarjeta no haya cambiado entre lectura y escritura,
+y distingue la verificación posterior fallida de un cambio confirmado. Las
+pruebas de integración utilizan un dispositivo ALSA simulado para cubrir el
+recorrido CLI → backend → argumentos de `amixer`, incluidos hotplug y error
+tras escribir. La validación en hardware real permanece pendiente.
+
+## Avance en conmutación (PR #4)
+
+`switch headphones`, `switch speakers` y `toggle` utilizan el selector ALSA
+real, sin índice fijo, con `cset` acotado a la tarjeta seleccionada y lectura
+posterior de confirmación. Se evitan escrituras cuando la salida ya está
+seleccionada; los comandos no restauran perfiles completos ni tocan PipeWire.
+Las pruebas usan hardware simulado. Falta contrastar en la AE-5 real que los
+perfiles originales no incluyeran DSP, ganancia o volumen necesarios antes de
+retirar el script gráfico y declarar la conmutación validada.
 
 ## Estado de la fase 01
 
@@ -131,3 +216,76 @@ en el síntoma.
 - Definir la compatibilidad mínima de Ubuntu y la licencia antes de distribuir.
 - Posponer control avanzado DSP, soporte de otras tarjetas y cambios automáticos
   de rutas PipeWire hasta completar el flujo principal.
+
+## Consolidación de CI de releases (PR #4)
+
+Las releases etiquetadas se procesan en un único job de publicación tras el gate
+de Python. Ese mismo runner comprueba que la etiqueta coincide con la versión y
+que el commit pertenece a `main`, ejecuta las pruebas de paquete, construye
+una sola vez, realiza smoke tests Ubuntu 22.04/24.04, firma y publica el `.deb`
+ya probado. La PR con `build-deb` sigue usando su job opcional independiente.
+No hay artefactos intermedios de Actions ni compilaciones en PR sin etiqueta.
+
+## Guardia contra estado obsoleto del selector (PR #4)
+
+La conmutación vuelve a leer el control justo antes de escribir y comprueba
+que el nombre, los índices/opciones enumeradas y el valor seleccionado coinciden
+con la lectura original. Si otro cliente cambia la salida, devuelve
+`state_changed` sin escribir; si cambia el control enumerado, devuelve
+`control_changed` sin escribir. La verificación posterior tampoco acepta
+una respuesta de otro control aunque indique la salida solicitada. Esto reduce
+las ventanas de carrera, pero no proporciona atomicidad ALSA entre la segunda
+lectura y `cset`. Hay pruebas con cambios concurrentes simulados y sigue
+pendiente comprobar el hardware AE-5 real.
+
+## Recopilación de evidencia en un solo diagnóstico (PR #4)
+
+`ae5ctl doctor --profiles --json` añade la comparación de los dos archivos
+`.state` originales al informe ALSA; puede combinarse con `--pipewire`.
+Ninguna de las dos opciones escribe en ALSA ni restaura estados. Si falta un
+archivo, `profiles.ok=false` y `profiles.error` explican el problema sin
+alterar el código de salida ALSA. La ausencia de `--profiles` conserva el
+contrato JSON previo. El informe combinado permite revisar con el usuario la
+identidad de la tarjeta, el selector real y las diferencias de volumen/DSP
+antes de retirar el script original. Una lectura correcta no valida el sonido
+físico; la prueba en Ubuntu sigue pendiente.
+
+## Fase 05 · validación física guiada (PR #4)
+
+`ae5ctl validate` inspecciona la selección y el cambio previsto sin escribir.
+`ae5ctl validate --apply` requiere confirmar audio inicial y teclear
+`CAMBIAR`; alterna mediante el motor ALSA, solicita confirmación auditiva
+humana y trata de restaurar la salida inicial incluso si hay interrupción.
+Una restauración fallida se informa explícitamente; no se aplican perfiles,
+volúmenes ni reparación automática. La comprobación del indicador GTK/Ayatana
+se documenta por separado en `docs/validation-ubuntu.md`. Los tests simulan
+hardware y respuestas del operador; no constituyen validación física.
+
+## Wizard auditivo con generación de señal de prueba (PR #4)
+
+`ae5ctl wizard` agrupa seis pasos visibles en la terminal: estado ALSA,
+comparación orientativa de los perfiles existentes, elección de una salida
+PipeWire/PulseAudio asociada por `alsa.card` (selección manual si falta la
+asociación), tono de prueba inicial, consentimiento `CAMBIAR`, tono tras
+conmutación y tercer tono después de restaurar. Utiliza `pactl -f json list
+sinks` para leer la sesión y `paplay --device` para reproducir un WAV
+temporal de amplitud digital baja. Nunca cambia la salida predeterminada del
+servidor, ajusta volúmenes ni restaura perfiles. `validate --apply` comparte
+este flujo; `validate` sin flag sigue siendo de solo lectura. Los tests
+simulan ALSA, PipeWire y ejecución de audio; falta validación física y GUI.
+
+## Ampliación del proyecto: AE-5 Control Center
+
+El alcance acordado incluye perfiles ALSA y PipeWire, volumen y mixer,
+DSP SBX, ecualizador, grabación/micrófono, wizard gráfico y extensión GNOME.
+La fase inmediata es el inventario *read-only* versionado de controles
+(`ae5ctl capabilities`) sin activar escritura: la salida muestra capacidades
+reportadas por ALSA y clasificación orientativa, no compatibilidad certificada.
+Roadmap, gates y criterios de seguridad en `docs/roadmap-control-center.md`.
+
+## Cambio a GNOME Extensions (PR #4)
+
+La extensión GJS para GNOME 46 pasa a ser la vía de distribución principal.
+Se retira el pipeline Debian y la etiqueta de PR `build-deb`, reemplazándolos
+por el ZIP y `build-gnome`. El código Python antiguo sigue en el repositorio
+solo como referencia mientras se prueban hardware y UI reales.

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ae5ctl"
 version = "0.1.0.dev0"
-description = "Read-only ALSA diagnostics for Sound BlasterX AE-5 on Linux"
+description = "Legacy ALSA tests retained during GNOME extension migration"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
@@ -24,7 +24,6 @@ xfail_strict = true
 [tool.ruff]
 target-version = "py310"
 line-length = 88
-# Preserve the original script while characterizing its behavior.
 extend-exclude = ["ae5-switcher.py"]
 
 [tool.ruff.lint]
